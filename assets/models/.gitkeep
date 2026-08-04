@@ -1,0 +1,10 @@
+# This file intentionally left as placeholder.
+# 
+# The following model files must be placed here before building:
+#   - gemma3-1b-it-gpu-int4.litertlm  (~529 MB) — LLM for note analysis
+#
+# The following model files ARE committed (small enough):
+#   - embedding_model.onnx            (~23 MB)  — all-MiniLM-L6-v2 int8
+#   - tokenizer.json                  (~0.5 MB) — BPE vocabulary
+#
+# See README.md for exact download and adb push commands.

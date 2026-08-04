@@ -1,0 +1,46 @@
+# Build outputs
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Dart/Flutter
+.packages
+pubspec.lock
+*.dart_snapshot
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.jks
+*.keystore
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Runner.xcworkspace/
+
+# ── Large model files — never commit ──────────────────────────────────────
+# Place these in assets/models/ locally after following README instructions.
+*.litertlm
+*.task
+*.gguf
+*.bin
+# Note: embedding_model.onnx and tokenizer.json (~24 MB total) ARE committed.
+
+# OS
+.DS_Store
+Thumbs.db
