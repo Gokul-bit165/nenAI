@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:memai/core/nlp/datetime_parser.dart';
+import 'package:nenai/core/nlp/datetime_parser.dart';
 
 void main() {
   group('DateTimeParser', () {
