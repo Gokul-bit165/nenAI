@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -17,7 +18,20 @@ class FlutterGemmaIntelligenceEngine implements NoteIntelligenceEngine {
   Future<void> init() async {
     try {
       final modelPath = await _resolveModelPath();
-      if (!File(modelPath).existsSync()) {
+      final localFile = File(modelPath);
+
+      // If model not in documents directory yet, check if it's bundled in APK assets
+      if (!localFile.existsSync()) {
+        try {
+          final assetData = await rootBundle.load('assets/models/${AppConstants.llmModelFileName}');
+          await localFile.parent.create(recursive: true);
+          await localFile.writeAsBytes(assetData.buffer.asUint8List(), flush: true);
+        } catch (_) {
+          // Model not bundled in assets
+        }
+      }
+
+      if (!localFile.existsSync()) {
         return;
       }
 
