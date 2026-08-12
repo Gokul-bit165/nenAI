@@ -10,43 +10,100 @@ class ProcessingBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (status) {
-      case ProcessingStatus.pending:
-      case ProcessingStatus.processing:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryLight),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'AI Processing...',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primaryLight.withOpacity(0.9),
-              ),
-            ),
-          ],
-        );
       case ProcessingStatus.completed:
-        return const SizedBox.shrink();
-      case ProcessingStatus.failed:
-        return const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.warning),
-            SizedBox(width: 4),
-            Text(
-              'Plain Text Saved',
-              style: TextStyle(fontSize: 12, color: AppColors.warning),
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.accentGreenLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_rounded, size: 13, color: AppColors.accentGreenDark),
+              SizedBox(width: 3),
+              Text(
+                'Done',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accentGreenDark,
+                ),
+              ),
+            ],
+          ),
+        );
+
+      case ProcessingStatus.processing:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.clusterIdeasBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 10,
+                height: 10,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.clusterIdeas),
+                ),
+              ),
+              SizedBox(width: 5),
+              Text(
+                'Processing',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.clusterIdeas,
+                ),
+              ),
+            ],
+          ),
+        );
+
+      case ProcessingStatus.pending:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Text(
+            'Pending',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
             ),
-          ],
+          ),
+        );
+
+      case ProcessingStatus.failed:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEE2E2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 13, color: AppColors.error),
+              SizedBox(width: 3),
+              Text(
+                'Failed',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ),
         );
     }
   }

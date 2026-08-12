@@ -21,66 +21,86 @@ class NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM d, h:mm a');
+    final dateFormat = DateFormat('MMM d, yyyy • h:mm a');
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      note.title,
-                      style: AppTextStyles.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Date/Time Header
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        note.title,
+                        style: AppTextStyles.titleMedium.copyWith(fontSize: 15),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    dateFormat.format(note.createdAt),
-                    style: AppTextStyles.labelSmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (note.summary != null && note.summary!.isNotEmpty)
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  note.summary!,
-                  style: AppTextStyles.bodyMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                )
-              else
+                  dateFormat.format(note.createdAt),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Note snippet / summary
                 Text(
-                  note.snippet,
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                  note.summary?.isNotEmpty == true
+                      ? note.summary!
+                      : note.snippet,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (cluster != null)
-                    ClusterChip(
-                      name: cluster!.name,
-                      colorHex: cluster!.colorHex,
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  ProcessingBadge(status: note.status),
-                ],
-              ),
-            ],
+                const SizedBox(height: 12),
+
+                // Footer Row: Cluster chip and Processing badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (cluster != null)
+                      ClusterChip(
+                        name: cluster!.name,
+                        colorHex: cluster!.colorHex,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    ProcessingBadge(status: note.status),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

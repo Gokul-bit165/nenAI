@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/editor/note_editor_screen.dart';
@@ -7,6 +8,7 @@ import '../screens/topics/topics_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/topics/cluster_detail_screen.dart';
+import '../screens/shell/main_shell_scaffold.dart';
 
 abstract class AppRoutes {
   static const String home = '/';
@@ -19,14 +21,67 @@ abstract class AppRoutes {
   static const String calendar = '/calendar';
 }
 
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: AppRoutes.home,
   routes: [
-    GoRoute(
-      path: AppRoutes.home,
-      builder: (context, state) => const HomeScreen(),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return MainShellScaffold(navigationShell: navigationShell);
+      },
+      branches: [
+        // Tab 0: Home
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.home,
+              builder: (context, state) => const HomeScreen(),
+            ),
+          ],
+        ),
+        // Tab 1: Search
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.search,
+              builder: (context, state) => const SearchScreen(),
+            ),
+          ],
+        ),
+        // Tab 2: Topics
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.topics,
+              builder: (context, state) => const TopicsScreen(),
+            ),
+          ],
+        ),
+        // Tab 3: Chat Assistant
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.chat,
+              builder: (context, state) => const ChatScreen(),
+            ),
+          ],
+        ),
+        // Tab 4: Calendar
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.calendar,
+              builder: (context, state) => const CalendarScreen(),
+            ),
+          ],
+        ),
+      ],
     ),
+    // Fullscreen Push Routes
     GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: AppRoutes.editor,
       builder: (context, state) {
         final noteId = state.extra as String?;
@@ -34,6 +89,7 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: AppRoutes.detail,
       builder: (context, state) {
         final id = state.pathParameters['id']!;
@@ -41,28 +97,13 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
-      path: AppRoutes.search,
-      builder: (context, state) => const SearchScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.topics,
-      builder: (context, state) => const TopicsScreen(),
-    ),
-    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: AppRoutes.clusterDetail,
       builder: (context, state) {
         final id = state.pathParameters['id']!;
         final name = (state.extra as String?) ?? 'Topic Notes';
         return ClusterDetailScreen(clusterId: id, clusterName: name);
       },
-    ),
-    GoRoute(
-      path: AppRoutes.chat,
-      builder: (context, state) => const ChatScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.calendar,
-      builder: (context, state) => const CalendarScreen(),
     ),
   ],
 );

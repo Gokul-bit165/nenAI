@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../components/keyword_chip.dart';
 import '../../components/processing_badge.dart';
 import '../../components/cluster_chip.dart';
+import '../../components/ai_summary_card.dart';
+import '../../components/related_note_card.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -27,108 +29,138 @@ class NoteDetailScreen extends ConsumerWidget {
       data: (note) {
         if (note == null) {
           return Scaffold(
-            appBar: AppBar(),
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: AppColors.background,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => context.pop(),
+              ),
+            ),
             body: const Center(child: Text('Note not found')),
           );
         }
 
-        final cluster = note.clusterId != null ? clusterMap[note.clusterId!] : null;
-        final relatedAsync = ref.watch(relatedNotesProvider(note.relatedNoteIds));
+        final cluster =
+            note.clusterId != null ? clusterMap[note.clusterId!] : null;
+        final relatedAsync =
+            ref.watch(relatedNotesProvider(note.relatedNoteIds));
+
+        // Format date/time
+        final dateFormat = DateFormat('MMMM d, yyyy • h:mm a');
+
+        // Extract body by stripping the first line title if it exists
+        String displayContent = note.content;
+        final lines = note.content.split('\n');
+        if (lines.isNotEmpty && lines.first.trim() == note.title.replaceAll('…', '')) {
+          if (lines.length > 1) {
+            displayContent = lines.sublist(1).join('\n').trimLeft();
+          }
+        }
+        if (displayContent.trim().isEmpty) {
+          displayContent = note.content;
+        }
 
         return Scaffold(
+          backgroundColor: Colors.white,
           appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+              onPressed: () => context.pop(),
+            ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.edit_outlined),
+                icon: const Icon(Icons.edit_outlined, color: AppColors.textPrimary),
+                tooltip: 'Edit Note',
                 onPressed: () => context.push(AppRoutes.editor, extra: note.id),
               ),
+              if (cluster != null)
+                IconButton(
+                  icon: const Icon(Icons.hub_outlined, color: AppColors.textPrimary),
+                  tooltip: 'View in Topic Graph',
+                  onPressed: () => context.push('/topics/${cluster.id}', extra: cluster.name),
+                ),
+              const SizedBox(width: 4),
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      DateFormat('MMMM d, yyyy • h:mm a').format(note.createdAt),
-                      style: AppTextStyles.labelSmall,
-                    ),
-                    ProcessingBadge(status: note.status),
-                  ],
+                // Date & Time
+                Text(
+                  dateFormat.format(note.createdAt),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Note Title
+                Text(
+                  note.title,
+                  style: AppTextStyles.headlineLarge.copyWith(fontSize: 24),
                 ),
                 const SizedBox(height: 12),
 
-                // Note title
-                Text(note.title, style: AppTextStyles.headlineLarge),
-                const SizedBox(height: 16),
+                // Cluster Chip & Status Badge Row
+                Row(
+                  children: [
+                    if (cluster != null) ...[
+                      ClusterChip(
+                        name: cluster.name,
+                        colorHex: cluster.colorHex,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    ProcessingBadge(status: note.status),
+                  ],
+                ),
+                const SizedBox(height: 20),
 
-                // Cluster chip if assigned
-                if (cluster != null) ...[
-                  ClusterChip(name: cluster.name, colorHex: cluster.colorHex),
-                  const SizedBox(height: 16),
-                ],
-
-                // Full note content
+                // Note Content Text
                 SelectableText(
-                  note.content,
-                  style: AppTextStyles.bodyLarge,
+                  displayContent,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    height: 1.6,
+                  ),
                 ),
                 const SizedBox(height: 24),
-                const Divider(color: AppColors.border),
-                const SizedBox(height: 16),
 
                 // AI Summary Card
                 if (note.summary != null && note.summary!.isNotEmpty) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.auto_awesome, size: 18, color: AppColors.primaryLight),
-                            SizedBox(width: 8),
-                            Text(
-                              'AI Summary',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryLight,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(note.summary!, style: AppTextStyles.bodyMedium),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  AISummaryCard(summary: note.summary!),
+                  const SizedBox(height: 24),
                 ],
 
-                // AI Keywords
+                // Keywords Section
                 if (note.keywords.isNotEmpty) ...[
-                  Text('Keywords', style: AppTextStyles.titleMedium),
+                  Text(
+                    'Keywords',
+                    style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                  ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: note.keywords.map((k) => KeywordChip(label: k)).toList(),
+                    children: [
+                      ...note.keywords.map((k) => KeywordChip(label: k)),
+                    ],
                   ),
                   const SizedBox(height: 24),
                 ],
 
                 // Related Notes Section
-                Text('Related Notes', style: AppTextStyles.titleMedium),
+                Text(
+                  'Related Notes',
+                  style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                ),
                 const SizedBox(height: 12),
 
                 relatedAsync.when(
@@ -138,45 +170,52 @@ class NoteDetailScreen extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Text(
                           'No related notes discovered yet.',
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       );
                     }
 
                     return Column(
                       children: relatedNotes.map((rNote) {
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            onTap: () => context.push('/detail/${rNote.id}'),
-                            title: Text(rNote.title, style: AppTextStyles.titleMedium.copyWith(fontSize: 15)),
-                            subtitle: Text(
-                              rNote.summary ?? rNote.snippet,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                          ),
+                        return RelatedNoteCard(
+                          note: rNote,
+                          onTap: () => context.push('/detail/${rNote.id}'),
                         );
                       }).toList(),
                     );
                   },
-                  loading: () => const LinearProgressIndicator(),
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
                   error: (_, __) => const SizedBox.shrink(),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 48),
               ],
             ),
           ),
         );
       },
       loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accentGreen),
+        ),
       ),
       error: (err, _) => Scaffold(
-        appBar: AppBar(),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: Center(child: Text('Error: $err')),
       ),
     );

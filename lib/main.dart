@@ -37,7 +37,7 @@ class NENAIApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'NENAI',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       routerConfig: appRouter,
     );
   }

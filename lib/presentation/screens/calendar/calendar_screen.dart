@@ -13,74 +13,261 @@ class CalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+  final List<Color> _eventColors = const [
+    Color(0xFF7C3AED), // Purple
+    Color(0xFF06B6D4), // Teal
+    Color(0xFF22C55E), // Green
+    Color(0xFFF59E0B), // Amber
+    Color(0xFFEC4899), // Pink
+  ];
+
+  final Color _selectedEventColor = const Color(0xFF7C3AED);
+
   void _showAddEventDialog(BuildContext context, WidgetRef ref, DateTime selectedDate) {
     final titleController = TextEditingController();
-    TimeOfDay selectedTime = TimeOfDay.now();
+    TimeOfDay startTime = TimeOfDay.now();
+    TimeOfDay endTime = TimeOfDay(
+      hour: (TimeOfDay.now().hour + 1) % 24,
+      minute: TimeOfDay.now().minute,
+    );
+    final DateTime eventDate = selectedDate;
+    Color pickedColor = _selectedEventColor;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Calendar Event'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Event Title',
-                  hintText: 'e.g. Design Team Sync',
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                top: 16,
+                left: 20,
+                right: 20,
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Time: ${selectedTime.format(context)}', style: AppTextStyles.bodyMedium),
-                  TextButton.icon(
-                    icon: const Icon(Icons.access_time_rounded),
-                    label: const Text('Change'),
-                    onPressed: () async {
+                  // Modal Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Text(
+                        'Add Event',
+                        style: AppTextStyles.titleMedium.copyWith(fontSize: 17),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final title = titleController.text.trim();
+                          if (title.isNotEmpty) {
+                            final eventStart = DateTime(
+                              eventDate.year,
+                              eventDate.month,
+                              eventDate.day,
+                              startTime.hour,
+                              startTime.minute,
+                            );
+                            await ref
+                                .read(calendarNotifierProvider.notifier)
+                                .addEvent(
+                                  title: title,
+                                  startTime: eventStart,
+                                );
+                          }
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                            color: AppColors.accentGreenDark,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Title Input
+                  TextField(
+                    controller: titleController,
+                    autofocus: true,
+                    style: AppTextStyles.titleMedium,
+                    decoration: InputDecoration(
+                      hintText: 'Event Title (e.g. Study Session)',
+                      hintStyle: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 15,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surfaceVariant,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Date Selection Row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today_rounded,
+                            size: 18, color: AppColors.textSecondary),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Date: ${DateFormat("MMM d, yyyy").format(eventDate)}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Start Time Row
+                  InkWell(
+                    onTap: () async {
                       final time = await showTimePicker(
                         context: context,
-                        initialTime: selectedTime,
+                        initialTime: startTime,
                       );
                       if (time != null) {
-                        selectedTime = time;
+                        setModalState(() => startTime = time);
                       }
                     },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time_rounded,
+                                  size: 18, color: AppColors.textSecondary),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Start Time: ${startTime.format(context)}',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Icon(Icons.chevron_right_rounded,
+                              size: 18, color: AppColors.textMuted),
+                        ],
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: 10),
+
+                  // End Time Row
+                  InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: endTime,
+                      );
+                      if (time != null) {
+                        setModalState(() => endTime = time);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time_rounded,
+                                  size: 18, color: AppColors.textSecondary),
+                              const SizedBox(width: 10),
+                              Text(
+                                'End Time: ${endTime.format(context)}',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Icon(Icons.chevron_right_rounded,
+                              size: 18, color: AppColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Color Picker Row
+                  Text(
+                    'Color',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: _eventColors.map((color) {
+                      final isSelected = pickedColor == color;
+                      return GestureDetector(
+                        onTap: () {
+                          setModalState(() => pickedColor = color);
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(color: AppColors.textPrimary, width: 2.5)
+                                : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final title = titleController.text.trim();
-                if (title.isNotEmpty) {
-                  final eventStart = DateTime(
-                    selectedDate.year,
-                    selectedDate.month,
-                    selectedDate.day,
-                    selectedTime.hour,
-                    selectedTime.minute,
-                  );
-                  await ref.read(calendarNotifierProvider.notifier).addEvent(
-                        title: title,
-                        startTime: eventStart,
-                      );
-                }
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Add Event'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -92,41 +279,47 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final notifier = ref.watch(calendarNotifierProvider.notifier);
     final selectedDate = state.selectedDate;
 
-    // Build 7-day horizontal date selector strip
-    final now = DateTime.now();
-    final days = List.generate(14, (i) => now.add(Duration(days: i - 3)));
+    // Generate 14-day strip centered on selected date
+    final startDay = selectedDate.subtract(const Duration(days: 3));
+    final days = List.generate(14, (i) => startDay.add(Duration(days: i)));
+
+    final monthYearStr = DateFormat('MMMM yyyy').format(selectedDate);
+    final selectedDateStr = DateFormat('EEE, MMM d, yyyy').format(selectedDate);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.secondary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.calendar_month_rounded, size: 20, color: Colors.white),
+            Text(
+              monthYearStr,
+              style: AppTextStyles.headlineMedium.copyWith(fontSize: 20),
             ),
-            const SizedBox(width: 10),
-            Text('Calendar', style: AppTextStyles.titleMedium),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month_rounded,
+                color: AppColors.textPrimary),
+            tooltip: 'Month View',
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date Selector Strip
+          // Weekly Date Strip
           Container(
-            height: 85,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(bottom: BorderSide(color: AppColors.surfaceVariant)),
-            ),
+            height: 80,
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               itemCount: days.length,
               itemBuilder: (context, index) {
                 final day = days[index];
@@ -137,11 +330,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 return GestureDetector(
                   onTap: () => notifier.selectDate(day),
                   child: Container(
-                    width: 58,
+                    width: 52,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
+                      color: isSelected
+                          ? AppColors.accentGreen
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -149,17 +344,34 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         Text(
                           DateFormat('EEE').format(day),
                           style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected ? Colors.white70 : AppColors.textMuted,
+                            fontSize: 11,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white.withOpacity(0.9)
+                                : AppColors.textMuted,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           day.day.toString(),
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textMuted.withOpacity(0.4),
+                            shape: BoxShape.circle,
                           ),
                         ),
                       ],
@@ -169,62 +381,144 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               },
             ),
           ),
+          const SizedBox(height: 4),
 
-          // Header for selected date
+          // Selected Date Header Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  DateFormat('EEEE, MMMM d, yyyy').format(selectedDate),
-                  style: AppTextStyles.titleMedium,
+                  selectedDateStr,
+                  style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
                 ),
-                Text(
-                  '${state.events.length} ${state.events.length == 1 ? "event" : "events"}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${state.events.length} ${state.events.length == 1 ? "event" : "events"}',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Events List
+          // Events Timeline List
           Expanded(
             child: state.events.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.event_note_outlined,
-                          size: 56,
-                          color: AppColors.textMuted.withOpacity(0.4),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No events scheduled for this day',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.event_note_outlined,
+                              size: 40,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No events scheduled for this day',
+                            style: AppTextStyles.titleSmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tap + to schedule an event or study session.',
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 4),
                     itemCount: state.events.length,
                     itemBuilder: (context, index) {
                       final event = state.events[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withOpacity(0.2),
-                            child: const Icon(Icons.event_rounded, color: AppColors.primaryLight, size: 20),
+                      final barColor =
+                          _eventColors[index % _eventColors.length];
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.border,
+                            width: 1,
                           ),
-                          title: Text(event.title, style: AppTextStyles.bodyLarge),
-                          subtitle: Text(
-                            '${DateFormat('h:mm a').format(event.startTime)} - ${DateFormat('h:mm a').format(event.endTime)}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Colored vertical bar indicator on left
+                            Container(
+                              width: 5,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: barColor,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(14),
+                                  bottomLeft: Radius.circular(14),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      event.title,
+                                      style:
+                                          AppTextStyles.titleSmall.copyWith(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${DateFormat("h:mm a").format(event.startTime)} – ${DateFormat("h:mm a").format(event.endTime)}',
+                                      style:
+                                          AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -232,10 +526,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddEventDialog(context, ref, selectedDate),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Event'),
+        backgroundColor: AppColors.accentGreen,
+        child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
       ),
     );
   }

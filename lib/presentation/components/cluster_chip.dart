@@ -1,62 +1,64 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class ClusterChip extends StatelessWidget {
   const ClusterChip({
     super.key,
     required this.name,
-    required this.colorHex,
+    this.colorHex,
   });
 
   final String name;
-  final String colorHex;
+  final String? colorHex;
 
-  Color _parseColor(String hex) {
-    try {
-      final buffer = StringBuffer();
-      if (hex.length == 6 || hex.length == 7) buffer.write('ff');
-      buffer.write(hex.replaceFirst('#', ''));
-      return Color(int.parse(buffer.toString(), radix: 16));
-    } catch (_) {
-      return Colors.purpleAccent;
+  (Color, Color) _getColors(String clusterName, String? hex) {
+    final lower = clusterName.toLowerCase();
+    if (lower.contains('tech')) {
+      return (AppColors.clusterTech, AppColors.clusterTechBg);
+    } else if (lower.contains('project')) {
+      return (AppColors.clusterProjects, AppColors.clusterProjectsBg);
+    } else if (lower.contains('ai') || lower.contains('ml')) {
+      return (AppColors.clusterAi, AppColors.clusterAiBg);
+    } else if (lower.contains('person')) {
+      return (AppColors.clusterPersonal, AppColors.clusterPersonalBg);
+    } else if (lower.contains('book')) {
+      return (AppColors.clusterBooks, AppColors.clusterBooksBg);
+    } else if (lower.contains('idea')) {
+      return (AppColors.clusterIdeas, AppColors.clusterIdeasBg);
     }
+
+    if (hex != null && hex.isNotEmpty) {
+      try {
+        final buffer = StringBuffer();
+        if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+        buffer.write(hex.replaceFirst('#', ''));
+        final color = Color(int.parse(buffer.toString(), radix: 16));
+        return (color, color.withOpacity(0.14));
+      } catch (_) {}
+    }
+
+    return (AppColors.primary, AppColors.primaryTint);
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(colorHex);
+    final (textColor, bgColor) = _getColors(name, colorHex);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.5), width: 1),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        name,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
       ),
     );
   }
