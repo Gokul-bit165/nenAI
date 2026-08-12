@@ -1,4 +1,6 @@
 import '../memory/hybrid_retriever.dart';
+import '../memory/memory_context_builder.dart';
+import '../agents/query_understanding_agent.dart';
 import '../../mcp/tool_executor.dart';
 import '../../mcp/tool_registry.dart';
 import '../../mcp/tool_protocol.dart';
@@ -8,79 +10,72 @@ class ChatResponse {
   const ChatResponse({
     required this.replyText,
     required this.citedNotes,
+    this.graphTriples = const [],
     this.pendingAction,
   });
 
   final String replyText;
   final List<HybridSearchResult> citedNotes;
+  final List<String> graphTriples;
   final ToolCallRequest? pendingAction;
 }
 
 class ChatService {
   ChatService({
     required HybridRetriever hybridRetriever,
+    required MemoryContextBuilder contextBuilder,
+    required QueryUnderstandingAgent queryAgent,
     required ToolRegistry toolRegistry,
     required ToolExecutor toolExecutor,
     required NoteIntelligenceEngine intelligenceEngine,
   })  : _hybridRetriever = hybridRetriever,
+        _contextBuilder = contextBuilder,
+        _queryAgent = queryAgent,
         _toolRegistry = toolRegistry,
         _toolExecutor = toolExecutor,
         _intelligenceEngine = intelligenceEngine;
 
   final HybridRetriever _hybridRetriever;
+  final MemoryContextBuilder _contextBuilder;
+  final QueryUnderstandingAgent _queryAgent;
   final ToolRegistry _toolRegistry;
   final ToolExecutor _toolExecutor;
   final NoteIntelligenceEngine _intelligenceEngine;
 
   Future<ChatResponse> handleUserMessage(String message) async {
-    final lower = message.toLowerCase().trim();
+    // 1. Query Understanding & Intent Analysis
+    final queryAnalysis = await _queryAgent.analyzeQuery(message);
 
-    // 1. Detect Alarm Intent ("set alarm...", "remind me to...", "alarm for...")
-    if (lower.contains('alarm') || lower.contains('remind me') || lower.contains('schedule reminder')) {
-      String title = 'Reminder';
-      if (lower.contains('remind me to')) {
-        title = message.substring(message.toLowerCase().indexOf('remind me to') + 12).trim();
-      } else if (lower.contains('alarm for')) {
-        title = message.substring(message.toLowerCase().indexOf('alarm for') + 9).trim();
-      }
-
+    // 2. Action Handlers (Alarms, Calendar, Stats)
+    if (queryAnalysis.actionIntent == 'set_alarm') {
       return ChatResponse(
         replyText: 'I detected an alarm request. Please confirm to set this alarm:',
         citedNotes: [],
         pendingAction: ToolCallRequest(
           toolName: 'set_alarm',
           parameters: {
-            'title': title,
+            'title': queryAnalysis.actionTitle ?? 'Reminder',
             'timeExpression': message,
           },
         ),
       );
     }
 
-    // 2. Detect Calendar Intent ("add to calendar", "calendar event", "schedule meeting")
-    if (lower.contains('calendar') || lower.contains('schedule meeting') || lower.contains('add event')) {
-      String title = 'Calendar Event';
-      if (lower.contains('meeting with')) {
-        title = message.substring(message.toLowerCase().indexOf('meeting with')).trim();
-      } else if (lower.contains('add')) {
-        title = message.substring(message.toLowerCase().indexOf('add') + 3).trim();
-      }
-
+    if (queryAnalysis.actionIntent == 'create_calendar_event') {
       return ChatResponse(
         replyText: 'I detected a calendar request. Please confirm to schedule this calendar event:',
         citedNotes: [],
         pendingAction: ToolCallRequest(
           toolName: 'create_calendar_event',
           parameters: {
-            'title': title,
+            'title': queryAnalysis.actionTitle ?? 'Calendar Event',
             'timeExpression': message,
           },
         ),
       );
     }
 
-    // 3. Detect Stats Intent ("how many notes", "stats", "count")
-    if (lower.contains('how many notes') || lower.contains('count notes') || lower.contains('memory stats')) {
+    if (queryAnalysis.actionIntent == 'get_memory_stats') {
       final result = await _toolExecutor.executeRequest(
         const ToolCallRequest(toolName: 'get_memory_stats', parameters: {}),
       );
@@ -90,27 +85,37 @@ class ChatService {
       );
     }
 
-    // 4. Hybrid RAG Search for Memory Queries
+    // 3. 3-Way Grounded Retrieval (FTS + Vector + Knowledge Graph)
     final searchResults = await _hybridRetriever.retrieve(message, limit: 3);
-    final contextTexts = searchResults.map((r) => r.note.content).toList();
+    
+    // 4. Build Grounded Context: Notes + Entities + Graph Triples + Tasks
+    final groundedContext = await _contextBuilder.buildContext(searchResults);
 
     String? llmAnswer;
-    if (_intelligenceEngine.isReady) {
-      llmAnswer = await _intelligenceEngine.chat(message, contextMemories: contextTexts);
+    if (_intelligenceEngine.isReady && groundedContext.contextString.isNotEmpty) {
+      llmAnswer = await _intelligenceEngine.chat(
+        message,
+        contextMemories: [groundedContext.contextString],
+      );
     }
 
     if (llmAnswer != null && llmAnswer.isNotEmpty) {
       return ChatResponse(
         replyText: llmAnswer,
         citedNotes: searchResults,
+        graphTriples: groundedContext.graphTriples,
       );
     }
 
     if (searchResults.isNotEmpty) {
       final topNote = searchResults.first.note;
+      final tripleInfo = groundedContext.graphTriples.isNotEmpty
+          ? '\n(Fact: ${groundedContext.graphTriples.first})'
+          : '';
       return ChatResponse(
-        replyText: 'Based on your memory: "${topNote.summary ?? topNote.content}"',
+        replyText: 'Based on your memory: "${topNote.summary ?? topNote.content}"$tripleInfo',
         citedNotes: searchResults,
+        graphTriples: groundedContext.graphTriples,
       );
     }
 

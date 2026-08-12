@@ -86,12 +86,19 @@ Required JSON format:
 {
   "topic": "<main topic in 3-5 words>",
   "summary": "<1-2 sentence summary of the note>",
-  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"]
+  "keywords": ["<keyword1>", "<keyword2>"],
+  "entities": [
+    {"name": "<entity name>", "type": "<person|project|technology|concept|organization>"}
+  ],
+  "facts": [
+    {"subject": "<source entity>", "predicate": "<suggested|helps_with|works_on|used_for|relates_to>", "object": "<target entity>"}
+  ],
+  "tasks": [
+    {"description": "<actionable task>", "time": "<due time or relative string if mentioned>"}
+  ]
 }
 
 Rules:
-- keywords must be 3 to 6 items
-- topic must be concise and descriptive
 - respond with ONLY the JSON object, nothing else
 
 Note:
@@ -113,11 +120,35 @@ $truncated''';
               .toList() ??
           [];
 
+      final entities = (map['entities'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((e) => ExtractedEntityMention.fromJson(e))
+              .where((e) => e.name.isNotEmpty)
+              .toList() ??
+          [];
+
+      final facts = (map['facts'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((f) => ExtractedFactTriple.fromJson(f))
+              .where((f) => f.subject.isNotEmpty && f.object.isNotEmpty)
+              .toList() ??
+          [];
+
+      final tasks = (map['tasks'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((t) => ExtractedTaskItem.fromJson(t))
+              .where((t) => t.description.isNotEmpty)
+              .toList() ??
+          [];
+
       if (summary.isEmpty) return null;
       return NoteAnalysisResult(
         topic: topic,
         summary: summary,
         keywords: keywords,
+        entities: entities,
+        facts: facts,
+        tasks: tasks,
       );
     } catch (_) {
       return null;

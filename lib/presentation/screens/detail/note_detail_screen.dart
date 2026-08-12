@@ -41,15 +41,16 @@ class NoteDetailScreen extends ConsumerWidget {
           );
         }
 
-        final cluster =
-            note.clusterId != null ? clusterMap[note.clusterId!] : null;
-        final relatedAsync =
-            ref.watch(relatedNotesProvider(note.relatedNoteIds));
+        final cluster = note.clusterId != null ? clusterMap[note.clusterId!] : null;
+        final relatedAsync = ref.watch(relatedNotesProvider(note.relatedNoteIds));
+        final entitiesAsync = ref.watch(noteEntitiesProvider(note.id));
+        final relationshipsAsync = ref.watch(noteRelationshipsProvider(note.id));
+        final tasksAsync = ref.watch(noteTasksProvider(note.id));
 
         // Format date/time
         final dateFormat = DateFormat('MMMM d, yyyy • h:mm a');
 
-        // Extract body by stripping the first line title if it exists
+        // Extract body
         String displayContent = note.content;
         final lines = note.content.split('\n');
         if (lines.isNotEmpty && lines.first.trim() == note.title.replaceAll('…', '')) {
@@ -122,13 +123,242 @@ class NoteDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Note Content Text
+                // Original Raw Content
                 SelectableText(
                   displayContent,
                   style: AppTextStyles.bodyLarge.copyWith(
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── What NENAI Understood ─────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.psychology_rounded, size: 20, color: Color(0xFF7C3AED)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'What NENAI Understood',
+                            style: AppTextStyles.titleMedium.copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Entities Breakdown
+                      entitiesAsync.when(
+                        data: (entities) {
+                          if (entities.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ENTITIES & CONCEPTS',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: entities.map((e) {
+                                  IconData icon = Icons.lightbulb_outline;
+                                  Color chipColor = const Color(0xFF64748B);
+                                  if (e.type == 'person') {
+                                    icon = Icons.person_outline;
+                                    chipColor = const Color(0xFF2563EB);
+                                  } else if (e.type == 'project') {
+                                    icon = Icons.rocket_launch_outlined;
+                                    chipColor = const Color(0xFF7C3AED);
+                                  } else if (e.type == 'technology') {
+                                    icon = Icons.memory_outlined;
+                                    chipColor = const Color(0xFF0D9488);
+                                  }
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: chipColor.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: chipColor.withOpacity(0.2)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(icon, size: 14, color: chipColor),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          e.name,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: chipColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                          );
+                        },
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+
+                      // Relationships Breakdown
+                      relationshipsAsync.when(
+                        data: (rels) {
+                          if (rels.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'KNOWLEDGE GRAPH CONNECTIONS',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              ...rels.map((r) => Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          r.sourceName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEDE9FE),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  r.relation,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF7C3AED),
+                                                  ),
+                                                ),
+                                              ),
+                                              const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF7C3AED)),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          r.targetName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
+                              const SizedBox(height: 14),
+                            ],
+                          );
+                        },
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+
+                      // Tasks Breakdown
+                      tasksAsync.when(
+                        data: (tasks) {
+                          if (tasks.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ACTION ITEMS & TASKS',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              ...tasks.map((t) => Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF10B981)),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            t.description,
+                                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                                          ),
+                                        ),
+                                        if (t.dueDate != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFEF3C7),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              t.dueDate!,
+                                              style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  )),
+                            ],
+                          );
+                        },
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),

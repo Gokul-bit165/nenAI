@@ -25,10 +25,22 @@ class StubIntelligenceEngine implements NoteIntelligenceEngine {
     // 3. Extract Topic
     final topic = _extractTopic(sentences.first, keywords);
 
+    // 4. Heuristic Entity Extraction (Capitalized proper nouns and key patterns)
+    final entities = _extractEntities(trimmed);
+
+    // 5. Heuristic Task Extraction (Sentences with 'should', 'need to', 'test', 'todo')
+    final tasks = _extractTasks(sentences);
+
+    // 6. Heuristic Fact Extraction
+    final facts = _extractFacts(trimmed, entities);
+
     return NoteAnalysisResult(
       topic: topic,
       summary: summary,
       keywords: keywords,
+      entities: entities,
+      facts: facts,
+      tasks: tasks,
     );
   }
   @override
@@ -81,6 +93,70 @@ class StubIntelligenceEngine implements NoteIntelligenceEngine {
     }
     final words = firstSentence.split(RegExp(r'\s+')).take(4).join(' ');
     return words.isEmpty ? 'General' : words;
+  }
+
+  List<ExtractedEntityMention> _extractEntities(String text) {
+    final results = <ExtractedEntityMention>[];
+    final seen = <String>{};
+
+    // Match capitalized multi-word phrases or single names: e.g., Arun, Gemma 3 1B, NENAI, Flutter
+    final nameRegex = RegExp(r'\b[A-Z][a-zA-Z0-9]*(?:\s+[A-Z0-9][a-zA-Z0-9]*)*\b');
+    final commonIgnore = {'Today', 'Yesterday', 'Tomorrow', 'The', 'This', 'That', 'These', 'Those', 'What', 'How', 'Why', 'When', 'Where', 'Who', 'I', 'My', 'We', 'Our', 'He', 'She', 'They', 'It'};
+
+    for (final match in nameRegex.allMatches(text)) {
+      final name = match.group(0)!.trim();
+      if (name.length > 1 && !commonIgnore.contains(name) && !seen.contains(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        String type = 'concept';
+        final lower = name.toLowerCase();
+        if (lower.contains('gemma') || lower.contains('flutter') || lower.contains('onnx') || lower.contains('sqlite') || lower.contains('dart')) {
+          type = 'technology';
+        } else if (lower.contains('nenai') || lower.contains('project') || lower.contains('app')) {
+          type = 'project';
+        } else if (!name.contains(RegExp(r'[0-9]')) && name.split(' ').length <= 2) {
+          type = 'person';
+        }
+        results.add(ExtractedEntityMention(name: name, type: type));
+      }
+    }
+    return results;
+  }
+
+  List<ExtractedTaskItem> _extractTasks(List<String> sentences) {
+    final tasks = <ExtractedTaskItem>[];
+    for (final s in sentences) {
+      final lower = s.toLowerCase();
+      if (lower.contains('should ') || lower.contains('need to ') || lower.contains('must ') || lower.contains('todo:') || lower.startsWith('test ')) {
+        final desc = s;
+        String? time;
+        if (lower.contains('tomorrow')) time = 'tomorrow';
+        if (lower.contains('today')) time = 'today';
+        if (lower.contains('next week')) time = 'next week';
+
+        tasks.add(ExtractedTaskItem(description: desc, time: time));
+      }
+    }
+    return tasks;
+  }
+
+  List<ExtractedFactTriple> _extractFacts(String text, List<ExtractedEntityMention> entities) {
+    final facts = <ExtractedFactTriple>[];
+    if (entities.length < 2) return facts;
+
+    final lower = text.toLowerCase();
+    final predicates = ['suggested', 'helps_with', 'works_on', 'used_in', 'relates_to', 'recommended'];
+
+    for (final p in predicates) {
+      if (lower.contains(p.replaceAll('_', ' '))) {
+        facts.add(ExtractedFactTriple(
+          subject: entities[0].name,
+          predicate: p,
+          object: entities.length > 1 ? entities[1].name : 'Project',
+        ));
+        break;
+      }
+    }
+    return facts;
   }
 
   @override
