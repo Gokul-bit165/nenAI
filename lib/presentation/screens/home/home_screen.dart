@@ -7,6 +7,8 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../../domain/entities/processing_status.dart';
 import 'home_notifier.dart';
+import 'clarification_notifier.dart';
+import 'clarification_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,9 +31,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(notesStreamProvider);
     final clustersAsync = ref.watch(clustersStreamProvider);
+    final pendingResolutionsAsync = ref.watch(pendingResolutionsStreamProvider);
 
     final clusters = clustersAsync.asData?.value ?? [];
     final clusterMap = {for (final c in clusters) c.id: c};
+    final pendingResolutions = pendingResolutionsAsync.asData?.value ?? [];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -102,6 +106,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+
+          // Pending Human-in-the-Loop Clarifications
+          if (pendingResolutions.isNotEmpty)
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final resolution = pendingResolutions[index];
+                  return ClarificationCard(
+                    key: ValueKey(resolution.id),
+                    resolution: resolution,
+                    onEditNote: () => context.push('/note/${resolution.memoryId}'),
+                  );
+                },
+                childCount: pendingResolutions.length,
+              ),
+            ),
 
           // Filter Chips Row
           SliverToBoxAdapter(

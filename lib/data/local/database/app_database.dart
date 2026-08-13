@@ -10,6 +10,11 @@ import 'tables/entities_table.dart';
 import 'tables/relationships_table.dart';
 import 'tables/tasks_table.dart';
 import 'tables/memory_entities_table.dart';
+import 'tables/context_nodes_table.dart';
+import 'tables/context_edges_table.dart';
+import 'tables/memory_contexts_table.dart';
+import 'tables/memory_evidence_table.dart';
+import 'tables/pending_resolutions_table.dart';
 
 import 'daos/notes_dao.dart';
 import 'daos/embeddings_dao.dart';
@@ -18,6 +23,9 @@ import 'daos/chat_messages_dao.dart';
 import 'daos/entities_dao.dart';
 import 'daos/relationships_dao.dart';
 import 'daos/tasks_dao.dart';
+import 'daos/context_dao.dart';
+import 'daos/evidence_dao.dart';
+import 'daos/pending_resolutions_dao.dart';
 
 part 'app_database.g.dart';
 
@@ -32,6 +40,11 @@ part 'app_database.g.dart';
     RelationshipsTable,
     TasksTable,
     MemoryEntitiesTable,
+    ContextNodesTable,
+    ContextEdgesTable,
+    MemoryContextsTable,
+    MemoryEvidenceTable,
+    PendingResolutionsTable,
   ],
   daos: [
     NotesDao,
@@ -41,6 +54,9 @@ part 'app_database.g.dart';
     EntitiesDao,
     RelationshipsDao,
     TasksDao,
+    ContextDao,
+    EvidenceDao,
+    PendingResolutionsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -65,6 +81,17 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(tasksTable);
             await m.createTable(memoryEntitiesTable);
           }
+          if (from < 4) {
+            await m.createTable(contextNodesTable);
+            await m.createTable(contextEdgesTable);
+            await m.createTable(memoryContextsTable);
+          }
+          if (from < 5) {
+            await m.createTable(memoryEvidenceTable);
+          }
+          if (from < 6) {
+            await m.createTable(pendingResolutionsTable);
+          }
         },
       );
 
@@ -76,6 +103,9 @@ class AppDatabase extends _$AppDatabase {
   EntitiesDao get entities => entitiesDao;
   RelationshipsDao get relationships => relationshipsDao;
   TasksDao get tasks => tasksDao;
+  ContextDao get contexts => contextDao;
+  EvidenceDao get evidence => evidenceDao;
+  PendingResolutionsDao get pendingResolutions => pendingResolutionsDao;
 }
 
 QueryExecutor _openConnection() {

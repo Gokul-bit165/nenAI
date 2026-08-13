@@ -8,6 +8,7 @@ import '../screens/topics/topics_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/topics/cluster_detail_screen.dart';
+import '../screens/explorer/memory_explorer_screen.dart';
 import '../screens/shell/main_shell_scaffold.dart';
 
 abstract class AppRoutes {
@@ -17,6 +18,7 @@ abstract class AppRoutes {
   static const String search = '/search';
   static const String topics = '/topics';
   static const String clusterDetail = '/topics/:id';
+  static const String explorer = '/explorer';
   static const String chat = '/chat';
   static const String calendar = '/calendar';
 }
@@ -104,6 +106,11 @@ final GoRouter appRouter = GoRouter(
         final name = (state.extra as String?) ?? 'Topic Notes';
         return ClusterDetailScreen(clusterId: id, clusterName: name);
       },
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: AppRoutes.explorer,
+      builder: (context, state) => const MemoryExplorerScreen(),
     ),
   ],
 );

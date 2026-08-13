@@ -101,6 +101,8 @@ Required JSON format:
   "topic": "<main topic in 3-5 words>",
   "summary": "<1-2 sentence summary of the note>",
   "keywords": ["<keyword1>", "<keyword2>"],
+  "topics": ["<topic1>", "<topic2>"],
+  "project": "<project name if mentioned, otherwise null>",
   "entities": [
     {"name": "<entity name>", "type": "<person|project|technology|concept|organization>"}
   ],
@@ -109,11 +111,20 @@ Required JSON format:
   ],
   "tasks": [
     {"description": "<actionable task>", "time": "<due time or relative string if mentioned>"}
-  ]
+  ],
+  "actions": [
+    {"type": "<completed|in_progress|planned>", "subject": "<action subject e.g. deployment, testing>"}
+  ],
+  "references": [
+    {"text": "<pronoun e.g. this, that, it>", "type": "anaphora", "resolution": null}
+  ],
+  "events": ["<event/meeting name if mentioned>"],
+  "temporalReferences": ["<time or relative date if mentioned>"]
 }
 
 Rules:
 - respond with ONLY the JSON object, nothing else
+- Do not invent missing context or resolve pronouns if the target is not in the text
 
 Note:
 $truncated''';
@@ -133,6 +144,14 @@ $truncated''';
               .take(6)
               .toList() ??
           [];
+
+      final topics = (map['topics'] as List<dynamic>?)
+              ?.map((k) => k.toString().trim())
+              .where((k) => k.isNotEmpty)
+              .toList() ??
+          keywords;
+
+      final project = (map['project'] as String?)?.trim();
 
       final entities = (map['entities'] as List<dynamic>?)
               ?.whereType<Map<String, dynamic>>()
@@ -155,6 +174,46 @@ $truncated''';
               .toList() ??
           [];
 
+      final actions = (map['actions'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((a) => ContextualAction.fromJson(a))
+              .where((a) => a.subject.isNotEmpty)
+              .toList() ??
+          [];
+
+      final references = (map['references'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((r) => ContextualReference.fromJson(r))
+              .where((r) => r.text.isNotEmpty)
+              .toList() ??
+          [];
+
+      final events = (map['events'] as List<dynamic>?)
+              ?.map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList() ??
+          [];
+
+      final temporalReferences = (map['temporalReferences'] as List<dynamic>?)
+              ?.map((t) => t.toString().trim())
+              .where((t) => t.isNotEmpty)
+              .toList() ??
+          [];
+
+      final people = entities
+          .where((e) => e.type == 'person')
+          .map((e) => e.name)
+          .toList();
+
+      final explicitRelationships = facts
+          .map((f) => ExplicitRelationshipCandidate(
+                source: f.subject,
+                target: f.object,
+                relation: f.predicate,
+                confidence: f.confidence,
+              ))
+          .toList();
+
       if (summary.isEmpty) return null;
       return NoteAnalysisResult(
         topic: topic,
@@ -163,6 +222,14 @@ $truncated''';
         entities: entities,
         facts: facts,
         tasks: tasks,
+        actions: actions,
+        references: references,
+        events: events,
+        topics: topics,
+        project: project,
+        people: people,
+        temporalReferences: temporalReferences,
+        explicitRelationships: explicitRelationships,
       );
     } catch (_) {
       return null;

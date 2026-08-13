@@ -22,6 +22,12 @@ class NoteRepositoryImpl implements NoteRepository {
       _db.notes.watchAll().map((rows) => rows.map(_rowToNote).toList());
 
   @override
+  Future<List<Note>> getAllNotes() async {
+    final rows = await _db.notes.getAllNotes();
+    return rows.map(_rowToNote).toList();
+  }
+
+  @override
   Stream<List<Note>> watchNotesByCluster(String clusterId) =>
       _db.notes
           .watchByCluster(clusterId)
