@@ -426,7 +426,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             vertical: 8),
                                       ),
-                                      onPressed: () {},
+                                      onPressed: () =>
+                                          notifier.dismissAction(message),
                                       child: const Text('Cancel',
                                           style: TextStyle(fontSize: 12)),
                                     ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/entities/note.dart';
+import '../../../domain/entities/processing_status.dart';
 import '../../../domain/entities/context_node.dart';
 import '../../../domain/repositories/note_repository.dart';
 import '../../../domain/repositories/context_repository.dart';
@@ -28,11 +29,13 @@ final relatedNotesProvider = FutureProvider.family.autoDispose<List<Note>, List<
 });
 
 final noteEntitiesProvider = FutureProvider.family.autoDispose<List<EntitiesTableData>, String>((ref, noteId) async {
+  ref.watch(noteDetailProvider(noteId));
   final db = getIt<AppDatabase>();
   return await db.entities.getEntitiesForMemory(noteId);
 });
 
 final noteRelationshipsProvider = FutureProvider.family.autoDispose<List<({String sourceName, String relation, String targetName})>, String>((ref, noteId) async {
+  ref.watch(noteDetailProvider(noteId));
   final db = getIt<AppDatabase>();
   final rels = await db.relationships.getByMemoryId(noteId);
   final results = <({String sourceName, String relation, String targetName})>[];
@@ -52,6 +55,7 @@ final noteRelationshipsProvider = FutureProvider.family.autoDispose<List<({Strin
 });
 
 final noteTasksProvider = FutureProvider.family.autoDispose<List<TasksTableData>, String>((ref, noteId) async {
+  ref.watch(noteDetailProvider(noteId));
   final db = getIt<AppDatabase>();
   return await db.tasks.getByMemoryId(noteId);
 });
@@ -85,6 +89,9 @@ class NoteUnderstandingState {
 }
 
 final noteUnderstandingProvider = FutureProvider.family.autoDispose<NoteUnderstandingState, String>((ref, noteId) async {
+  final noteAsync = ref.watch(noteDetailProvider(noteId));
+  final note = noteAsync.asData?.value;
+
   final db = getIt<AppDatabase>();
   final contextRepository = getIt<ContextRepository>();
 
@@ -116,6 +123,19 @@ final noteUnderstandingProvider = FutureProvider.family.autoDispose<NoteUndersta
       candidateOptions: candidates,
       pendingResolutionId: pending.id,
       statusText: 'Needs Clarification',
+    );
+  }
+
+  // 2. If actively processing in background isolate
+  if (note != null && note.status == ProcessingStatus.processing) {
+    return const NoteUnderstandingState(
+      contextName: 'Analyzing Note...',
+      pathNodes: ['Processing'],
+      reason: 'NENAI is actively analyzing entities, references, and hierarchical contexts...',
+      confidenceLevel: 'Processing',
+      confidenceScore: null,
+      evidenceSignals: ['Context extraction in progress...'],
+      statusText: 'Processing',
     );
   }
 

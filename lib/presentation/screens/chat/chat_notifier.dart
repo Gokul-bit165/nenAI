@@ -196,4 +196,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     state = state.copyWith(messages: updatedMessages);
   }
+
+  Future<void> dismissAction(ChatMessage message) async {
+    final updatedMessages = state.messages.map((m) {
+      if (m.id == message.id) {
+        final updated = m.copyWith(
+          pendingAction: null,
+          actionExecutedMessage: 'Action cancelled.',
+        );
+        _persistMessage(updated);
+        return updated;
+      }
+      return m;
+    }).toList();
+
+    state = state.copyWith(messages: updatedMessages);
+  }
 }
