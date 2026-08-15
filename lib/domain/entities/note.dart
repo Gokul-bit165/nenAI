@@ -40,11 +40,13 @@ class Note {
 
   /// Derived title — first non-empty line of [content], truncated to 60 chars.
   String get title {
-    final firstLine = content.split('\n').firstWhere(
-          (l) => l.trim().isNotEmpty,
-          orElse: () => '',
-        );
-    return firstLine.length > 60 ? '${firstLine.substring(0, 60)}…' : firstLine;
+    final lines = content.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    if (lines.isEmpty) return 'Untitled Note';
+    String candidate = lines.first.trim();
+    if (candidate.length < 3 && lines.length > 1) {
+      candidate = lines.join(' ').trim();
+    }
+    return candidate.length > 60 ? '${candidate.substring(0, 60)}…' : candidate;
   }
 
   /// Preview snippet shown in the note list card (first ~120 chars of content).

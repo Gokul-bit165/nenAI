@@ -7,6 +7,7 @@ import '../../components/processing_badge.dart';
 import '../../components/cluster_chip.dart';
 import '../../components/ai_summary_card.dart';
 import '../../components/related_note_card.dart';
+import '../../components/memory_understanding_card.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -46,6 +47,7 @@ class NoteDetailScreen extends ConsumerWidget {
         final entitiesAsync = ref.watch(noteEntitiesProvider(note.id));
         final relationshipsAsync = ref.watch(noteRelationshipsProvider(note.id));
         final tasksAsync = ref.watch(noteTasksProvider(note.id));
+        final understandingAsync = ref.watch(noteUnderstandingProvider(note.id));
 
         // Format date/time
         final dateFormat = DateFormat('MMMM d, yyyy • h:mm a');
@@ -134,242 +136,251 @@ class NoteDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // ── What NENAI Understood ─────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                // ── 1. WHAT NENAI UNDERSTOOD (Phase 13 Core Component) ─────────
+                understandingAsync.when(
+                  data: (state) => MemoryUnderstandingCard(
+                    contextName: state.contextName,
+                    contextType: state.contextType,
+                    pathNodes: state.pathNodes,
+                    reason: state.reason,
+                    confidenceLevel: state.confidenceLevel,
+                    confidenceScore: state.confidenceScore,
+                    evidenceSignals: state.evidenceSignals,
+                    statusText: state.statusText,
+                    isAmbiguous: state.isAmbiguous,
+                    candidateOptions: state.candidateOptions,
+                    onSelectCandidate: (candidateId) async {
+                      if (state.pendingResolutionId != null) {
+                        final cand = state.candidateOptions.firstWhere(
+                          (c) => c.id == candidateId,
+                          orElse: () => CandidateOption(id: candidateId, name: 'Selected Context', scorePercent: 100),
+                        );
+                        await resolvePendingContext(
+                          ref,
+                          noteId: note.id,
+                          pendingResolutionId: state.pendingResolutionId!,
+                          selectedContextId: candidateId,
+                          selectedContextName: cand.name,
+                        );
+                      }
+                    },
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.psychology_rounded, size: 20, color: Color(0xFF7C3AED)),
-                          const SizedBox(width: 8),
-                          Text(
-                            'What NENAI Understood',
-                            style: AppTextStyles.titleMedium.copyWith(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Entities Breakdown
-                      entitiesAsync.when(
-                        data: (entities) {
-                          if (entities.isEmpty) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'ENTITIES & CONCEPTS',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children: entities.map((e) {
-                                  IconData icon = Icons.lightbulb_outline;
-                                  Color chipColor = const Color(0xFF64748B);
-                                  if (e.type == 'person') {
-                                    icon = Icons.person_outline;
-                                    chipColor = const Color(0xFF2563EB);
-                                  } else if (e.type == 'project') {
-                                    icon = Icons.rocket_launch_outlined;
-                                    chipColor = const Color(0xFF7C3AED);
-                                  } else if (e.type == 'technology') {
-                                    icon = Icons.memory_outlined;
-                                    chipColor = const Color(0xFF0D9488);
-                                  }
-
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: chipColor.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: chipColor.withOpacity(0.2)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(icon, size: 14, color: chipColor),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          e.name,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: chipColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-
-                      // Relationships Breakdown
-                      relationshipsAsync.when(
-                        data: (rels) {
-                          if (rels.isEmpty) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'KNOWLEDGE GRAPH CONNECTIONS',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              ...rels.map((r) => Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          r.sourceName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFEDE9FE),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  r.relation,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF7C3AED),
-                                                  ),
-                                                ),
-                                              ),
-                                              const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF7C3AED)),
-                                            ],
-                                          ),
-                                        ),
-                                        Text(
-                                          r.targetName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )),
-                              const SizedBox(height: 14),
-                            ],
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-
-                      // Tasks Breakdown
-                      tasksAsync.when(
-                        data: (tasks) {
-                          if (tasks.isEmpty) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'ACTION ITEMS & TASKS',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              ...tasks.map((t) => Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF10B981)),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            t.description,
-                                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-                                          ),
-                                        ),
-                                        if (t.dueDate != null)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFEF3C7),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              t.dueDate!,
-                                              style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), fontWeight: FontWeight.w600),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  )),
-                            ],
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-                    ],
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
                   ),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
                 const SizedBox(height: 24),
 
-                // AI Summary Card
+                // ── 2. Entities & Knowledge Graph ────────────────────────────
+                entitiesAsync.when(
+                  data: (entities) {
+                    if (entities.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Extracted Entities',
+                          style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: entities.map((e) {
+                            IconData icon = Icons.lightbulb_outline;
+                            Color chipColor = const Color(0xFF64748B);
+                            if (e.type == 'person') {
+                              icon = Icons.person_outline;
+                              chipColor = const Color(0xFF2563EB);
+                            } else if (e.type == 'project') {
+                              icon = Icons.rocket_launch_outlined;
+                              chipColor = const Color(0xFF7C3AED);
+                            } else if (e.type == 'technology') {
+                              icon = Icons.memory_outlined;
+                              chipColor = const Color(0xFF0D9488);
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: chipColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: chipColor.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(icon, size: 14, color: chipColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    e.name,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: chipColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+
+                // ── 3. Knowledge Graph Connections ───────────────────────────
+                relationshipsAsync.when(
+                  data: (rels) {
+                    if (rels.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Knowledge Graph Connections',
+                          style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 10),
+                        ...rels.map((r) => Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    r.sourceName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEDE9FE),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            r.relation,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF7C3AED),
+                                            ),
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF7C3AED)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    r.targetName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+
+                // ── 4. Action Items & Tasks ──────────────────────────────────
+                tasksAsync.when(
+                  data: (tasks) {
+                    if (tasks.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Action Items & Tasks',
+                          style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 10),
+                        ...tasks.map((t) => Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    t.isCompleted
+                                        ? Icons.check_circle_rounded
+                                        : Icons.check_circle_outline_rounded,
+                                    size: 16,
+                                    color: t.isCompleted
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      t.description,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: const Color(0xFF1E293B),
+                                        decoration: t.isCompleted ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                  ),
+                                  if (t.dueDate != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        t.dueDate!,
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            )),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+
+                // ── 5. AI Summary Card ───────────────────────────────────────
                 if (note.summary != null && note.summary!.isNotEmpty) ...[
                   AISummaryCard(summary: note.summary!),
                   const SizedBox(height: 24),
                 ],
 
-                // Keywords Section
+                // ── 6. Keywords Section ──────────────────────────────────────
                 if (note.keywords.isNotEmpty) ...[
                   Text(
                     'Keywords',
@@ -386,7 +397,7 @@ class NoteDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                 ],
 
-                // Related Notes Section
+                // ── 7. Related Notes Section ─────────────────────────────────
                 Text(
                   'Related Notes',
                   style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
@@ -399,33 +410,30 @@ class NoteDetailScreen extends ConsumerWidget {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Text(
-                          'No related notes discovered yet.',
+                          'No related notes linked yet.',
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textMuted,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
                       );
                     }
-
                     return Column(
-                      children: relatedNotes.map((rNote) {
-                        return RelatedNoteCard(
-                          note: rNote,
-                          onTap: () => context.push('/detail/${rNote.id}'),
-                        );
-                      }).toList(),
+                      children: relatedNotes
+                          .map((r) => RelatedNoteCard(
+                                note: r,
+                                onTap: () => context.push(
+                                  '/note/${r.id}',
+                                  extra: r.id,
+                                ),
+                              ))
+                          .toList(),
                     );
                   },
-                  loading: () => const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
+                  loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
                 ),
-
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -433,11 +441,9 @@ class NoteDetailScreen extends ConsumerWidget {
       },
       loading: () => const Scaffold(
         backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.accentGreen),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       ),
-      error: (err, _) => Scaffold(
+      error: (e, st) => Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -446,7 +452,7 @@ class NoteDetailScreen extends ConsumerWidget {
             onPressed: () => context.pop(),
           ),
         ),
-        body: Center(child: Text('Error: $err')),
+        body: Center(child: Text('Error loading note: $e')),
       ),
     );
   }

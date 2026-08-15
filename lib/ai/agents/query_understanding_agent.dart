@@ -25,14 +25,22 @@ class QueryUnderstandingAgent {
     String? actionTitle;
 
     // Detect Alarm Intent
-    if (lower.contains('alarm') || lower.contains('remind me') || lower.contains('schedule reminder')) {
+    if (lower.contains('alarm') ||
+        lower.contains('remind') ||
+        lower.contains('wake me') ||
+        lower.contains('set timer') ||
+        lower.contains('schedule reminder')) {
       actionIntent = 'set_alarm';
       if (lower.contains('remind me to')) {
         actionTitle = message.substring(message.toLowerCase().indexOf('remind me to') + 12).trim();
+      } else if (lower.contains('remind me')) {
+        actionTitle = message.substring(message.toLowerCase().indexOf('remind me') + 9).trim();
       } else if (lower.contains('alarm for')) {
         actionTitle = message.substring(message.toLowerCase().indexOf('alarm for') + 9).trim();
+      } else if (lower.contains('wake me up')) {
+        actionTitle = 'Morning Alarm';
       } else {
-        actionTitle = 'Reminder';
+        actionTitle = 'Alarm';
       }
     }
     // Detect Calendar Intent

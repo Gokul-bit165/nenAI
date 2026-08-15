@@ -10,6 +10,9 @@ import 'package:nenai/ai/memory/retrieval_planner.dart';
 import 'package:nenai/ai/memory/memory_context_builder.dart';
 import 'package:nenai/ai/memory/hybrid_retriever.dart';
 import 'package:nenai/data/repositories/note_repository_impl.dart';
+import 'package:nenai/data/repositories/context_repository_impl.dart';
+import 'package:nenai/data/repositories/evidence_repository_impl.dart';
+import 'package:nenai/data/repositories/resolution_repository_impl.dart';
 import 'package:nenai/data/local/vector/vector_store.dart';
 import 'package:nenai/domain/ai/embedding_engine.dart';
 import 'package:nenai/domain/entities/note.dart';
@@ -42,7 +45,19 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     entityResolver = EntityResolver(db.entities);
     memoryReasoner = MemoryReasoner(db.relationships);
-    memoryRouter = MemoryRouter(db);
+    final contextRepository = ContextRepositoryImpl(db);
+    final evidenceRepository = EvidenceRepositoryImpl(db);
+    final resolutionRepository = ResolutionRepositoryImpl(
+      db: db,
+      contextRepository: contextRepository,
+      evidenceRepository: evidenceRepository,
+    );
+    memoryRouter = MemoryRouter(
+      db: db,
+      contextRepository: contextRepository,
+      evidenceRepository: evidenceRepository,
+      resolutionRepository: resolutionRepository,
+    );
     vectorStore = VectorStore(db);
     repository = NoteRepositoryImpl(db, vectorStore);
     retrievalPlanner = RetrievalPlanner(db.entities);
@@ -116,6 +131,7 @@ void main() {
     // Memory Reasoner for Note 1
     final ops1 = await memoryReasoner.reason(
       noteId: note1Id,
+      noteText: note1Content,
       analysis: analysis1,
       resolvedEntities: resolved1,
     );
@@ -187,6 +203,7 @@ void main() {
     // Memory Reasoner & Router for Note 2
     final ops2 = await memoryReasoner.reason(
       noteId: note2Id,
+      noteText: note2Content,
       analysis: analysis2,
       resolvedEntities: resolved2,
     );

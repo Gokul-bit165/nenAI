@@ -13,8 +13,8 @@ class DateTimeParser {
     final text = input.toLowerCase().trim();
     if (text.isEmpty) return null;
 
-    // 1. Relative offset parsing: "in X minutes/hours/days"
-    final relativeRegex = RegExp(r'\bin\s+(\d+)\s+(minute|min|hour|hr|day)s?\b');
+    // 1. Relative offset parsing: "in/after X minutes/hours/days"
+    final relativeRegex = RegExp(r'\b(?:in|after)\s+(\d+)\s+(minute|min|hour|hr|day)s?\b');
     final relativeMatch = relativeRegex.firstMatch(text);
     if (relativeMatch != null) {
       final amount = int.parse(relativeMatch.group(1)!);
@@ -68,7 +68,7 @@ class DateTimeParser {
     }
 
     // 4. "Today" or explicit time provided
-    if (text.contains('today') || timeResult != null) {
+    if (text.contains('today') || text.contains('tonight') || timeResult != null) {
       var candidate = DateTime(now.year, now.month, now.day, hour, minute);
       if (candidate.isBefore(now)) {
         // If time is earlier today, schedule for tomorrow at that time
@@ -91,18 +91,31 @@ class DateTimeParser {
 
       if (ampm == 'pm' && h < 12) h += 12;
       if (ampm == 'am' && h == 12) h = 0;
-      return (hour: h, minute: m);
+      return (hour: h % 24, minute: m);
     }
 
-    // Hour only with am/pm: "9am", "5 pm", "11pm"
-    final hourAmPmRegex = RegExp(r'\b(\d{1,2})\s*(am|pm)\b');
+    // Hour only with am/pm or o'clock: "9am", "5 pm", "11pm", "6 o'clock"
+    final hourAmPmRegex = RegExp(r'\b(\d{1,2})\s*(?:o\s*clock|am|pm)\b');
     final hourMatch = hourAmPmRegex.firstMatch(text);
     if (hourMatch != null) {
       int h = int.parse(hourMatch.group(1)!);
-      final ampm = hourMatch.group(2);
-      if (ampm == 'pm' && h < 12) h += 12;
-      if (ampm == 'am' && h == 12) h = 0;
-      return (hour: h, minute: 0);
+      final raw = hourMatch.group(0)!;
+      if (raw.contains('pm') && h < 12) h += 12;
+      if (raw.contains('am') && h == 12) h = 0;
+      return (hour: h % 24, minute: 0);
+    }
+
+    // Explicit "at 6" / "for 7"
+    final atForRegex = RegExp(r'\b(?:at|for)\s+(\d{1,2})\b');
+    final atForMatch = atForRegex.firstMatch(text);
+    if (atForMatch != null) {
+      int h = int.parse(atForMatch.group(1)!);
+      if (h >= 1 && h <= 24) {
+        if (text.contains('night') || text.contains('evening') || text.contains('pm')) {
+          if (h < 12) h += 12;
+        }
+        return (hour: h % 24, minute: 0);
+      }
     }
 
     return null;

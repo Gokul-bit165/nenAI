@@ -46,6 +46,14 @@ class RetrievalPlanner {
       intent = 'retrieve_person';
     } else if (lower.contains('project') || lower.contains('architecture')) {
       intent = 'retrieve_project';
+    } else if (lower.contains('today') ||
+        lower.contains('summarize today') ||
+        lower.contains('this week') ||
+        lower.contains('this month') ||
+        lower.contains('yesterday') ||
+        lower.contains('what did i do') ||
+        lower.contains('what happened today')) {
+      intent = 'temporal_summary';
     }
 
     // 3. Extract keywords

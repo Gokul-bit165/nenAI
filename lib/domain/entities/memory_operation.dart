@@ -40,14 +40,19 @@ class ResolvedEntity {
 
 /// Typed operations emitted by the Memory Reasoner and executed by the Memory Router.
 enum OperationType {
+  createContext,
+  attachMemory,
+  createChildContext,
+  linkContext,
+  updateContext,
+  createRelationship,
+  createTask,
+  mergeContext,
+  splitContext,
+  requestClarification,
   createEntity,
   updateEntity,
-  createRelationship,
-  updateRelationship,
-  createTask,
-  updateTask,
   linkMemory,
-  updateMemory,
   noOp,
 }
 
@@ -60,6 +65,134 @@ class MemoryOperation {
 
   final OperationType type;
   final Map<String, dynamic> payload;
+
+  factory MemoryOperation.createContext({
+    required String id,
+    required String name,
+    required String type,
+    String? originatingMemoryId,
+  }) =>
+      MemoryOperation(
+        type: OperationType.createContext,
+        payload: {
+          'id': id,
+          'name': name,
+          'type': type,
+          if (originatingMemoryId != null) 'originatingMemoryId': originatingMemoryId,
+        },
+      );
+
+  factory MemoryOperation.attachMemory({
+    required String memoryId,
+    required String contextId,
+    String? contextName,
+    String role = 'attached',
+    double confidence = 1.0,
+    String? evidence,
+  }) =>
+      MemoryOperation(
+        type: OperationType.attachMemory,
+        payload: {
+          'memoryId': memoryId,
+          'contextId': contextId,
+          if (contextName != null) 'contextName': contextName,
+          'role': role,
+          'confidence': confidence,
+          if (evidence != null) 'evidence': evidence,
+        },
+      );
+
+  factory MemoryOperation.createChildContext({
+    required String id,
+    required String parentContextId,
+    required String childName,
+    required String childType,
+    String relationType = 'has_child',
+    String? originatingMemoryId,
+  }) =>
+      MemoryOperation(
+        type: OperationType.createChildContext,
+        payload: {
+          'id': id,
+          'parentContextId': parentContextId,
+          'childName': childName,
+          'childType': childType,
+          'relationType': relationType,
+          if (originatingMemoryId != null) 'originatingMemoryId': originatingMemoryId,
+        },
+      );
+
+  factory MemoryOperation.linkContext({
+    required String sourceContextId,
+    required String targetContextId,
+    String relationType = 'relates_to',
+    double confidence = 1.0,
+    String? evidence,
+    String? originatingMemoryId,
+  }) =>
+      MemoryOperation(
+        type: OperationType.linkContext,
+        payload: {
+          'sourceContextId': sourceContextId,
+          'targetContextId': targetContextId,
+          'relationType': relationType,
+          'confidence': confidence,
+          if (evidence != null) 'evidence': evidence,
+          if (originatingMemoryId != null) 'originatingMemoryId': originatingMemoryId,
+        },
+      );
+
+  factory MemoryOperation.updateContext({
+    required String contextId,
+    String? name,
+    String? type,
+  }) =>
+      MemoryOperation(
+        type: OperationType.updateContext,
+        payload: {
+          'contextId': contextId,
+          if (name != null) 'name': name,
+          if (type != null) 'type': type,
+        },
+      );
+
+  factory MemoryOperation.mergeContext({
+    required String sourceContextId,
+    required String targetContextId,
+  }) =>
+      MemoryOperation(
+        type: OperationType.mergeContext,
+        payload: {
+          'sourceContextId': sourceContextId,
+          'targetContextId': targetContextId,
+        },
+      );
+
+  factory MemoryOperation.splitContext({
+    required String sourceContextId,
+    required List<Map<String, String>> newChildNodes,
+  }) =>
+      MemoryOperation(
+        type: OperationType.splitContext,
+        payload: {
+          'sourceContextId': sourceContextId,
+          'newChildNodes': newChildNodes,
+        },
+      );
+
+  factory MemoryOperation.requestClarification({
+    required String memoryId,
+    required String noteTextSnippet,
+    required List<Map<String, dynamic>> candidates,
+  }) =>
+      MemoryOperation(
+        type: OperationType.requestClarification,
+        payload: {
+          'memoryId': memoryId,
+          'noteTextSnippet': noteTextSnippet,
+          'candidates': candidates,
+        },
+      );
 
   factory MemoryOperation.createEntity({
     required String id,
@@ -84,6 +217,7 @@ class MemoryOperation {
     required String targetEntityId,
     required String sourceMemoryId,
     double confidence = 1.0,
+    String inferenceType = 'extracted',
   }) =>
       MemoryOperation(
         type: OperationType.createRelationship,
@@ -94,6 +228,7 @@ class MemoryOperation {
           'targetEntityId': targetEntityId,
           'sourceMemoryId': sourceMemoryId,
           'confidence': confidence,
+          'inferenceType': inferenceType,
         },
       );
 

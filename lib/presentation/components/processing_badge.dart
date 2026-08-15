@@ -82,6 +82,30 @@ class ProcessingBadge extends StatelessWidget {
           ),
         );
 
+      case ProcessingStatus.needsUserClarification:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.electricViolet.withAlpha(30),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.help_outline_rounded, size: 13, color: AppColors.electricViolet),
+              SizedBox(width: 3),
+              Text(
+                'Clarification',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.electricViolet,
+                ),
+              ),
+            ],
+          ),
+        );
+
       case ProcessingStatus.failed:
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

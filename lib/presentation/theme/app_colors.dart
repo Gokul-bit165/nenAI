@@ -13,6 +13,7 @@ abstract class AppColors {
   static const Color primaryLight = Color(0xFF8B5CF6);
   static const Color primaryTint = Color(0xFFEDE9FE);
   static const Color primaryDark = Color(0xFF533391);
+  static const Color electricViolet = Color(0xFF8B5CF6);
 
   static const Color accentGreen = Color(0xFF22C55E); // Fresh Emerald Green
   static const Color accentGreenDark = Color(0xFF16A34A);

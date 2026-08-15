@@ -1,6 +1,8 @@
+import 'package:intl/intl.dart';
 import '../memory/hybrid_retriever.dart';
 import '../memory/memory_context_builder.dart';
 import '../agents/query_understanding_agent.dart';
+import '../agents/memory_recall_agent.dart';
 import '../../mcp/tool_executor.dart';
 import '../../mcp/tool_registry.dart';
 import '../../mcp/tool_protocol.dart';
@@ -12,12 +14,22 @@ class ChatResponse {
     required this.citedNotes,
     this.graphTriples = const [],
     this.pendingAction,
+    this.questionType = RecallQuestionType.general,
+    this.isClarification = false,
+    this.candidateOptions = const [],
+    this.sourceNoteIds = const [],
+    this.contextPath,
   });
 
   final String replyText;
   final List<HybridSearchResult> citedNotes;
   final List<String> graphTriples;
   final ToolCallRequest? pendingAction;
+  final RecallQuestionType questionType;
+  final bool isClarification;
+  final List<String> candidateOptions;
+  final List<String> sourceNoteIds;
+  final String? contextPath;
 }
 
 class ChatService {
@@ -28,12 +40,14 @@ class ChatService {
     required ToolRegistry toolRegistry,
     required ToolExecutor toolExecutor,
     required NoteIntelligenceEngine intelligenceEngine,
+    MemoryRecallAgent? recallAgent,
   })  : _hybridRetriever = hybridRetriever,
         _contextBuilder = contextBuilder,
         _queryAgent = queryAgent,
         _toolRegistry = toolRegistry,
         _toolExecutor = toolExecutor,
-        _intelligenceEngine = intelligenceEngine;
+        _intelligenceEngine = intelligenceEngine,
+        _recallAgent = recallAgent;
 
   final HybridRetriever _hybridRetriever;
   final MemoryContextBuilder _contextBuilder;
@@ -41,6 +55,7 @@ class ChatService {
   final ToolRegistry _toolRegistry;
   final ToolExecutor _toolExecutor;
   final NoteIntelligenceEngine _intelligenceEngine;
+  final MemoryRecallAgent? _recallAgent;
 
   Future<ChatResponse> handleUserMessage(String message) async {
     // 1. Query Understanding & Intent Analysis
@@ -50,7 +65,7 @@ class ChatService {
     if (queryAnalysis.actionIntent == 'set_alarm') {
       return ChatResponse(
         replyText: 'I detected an alarm request. Please confirm to set this alarm:',
-        citedNotes: [],
+        citedNotes: const [],
         pendingAction: ToolCallRequest(
           toolName: 'set_alarm',
           parameters: {
@@ -64,7 +79,7 @@ class ChatService {
     if (queryAnalysis.actionIntent == 'create_calendar_event') {
       return ChatResponse(
         replyText: 'I detected a calendar request. Please confirm to schedule this calendar event:',
-        citedNotes: [],
+        citedNotes: const [],
         pendingAction: ToolCallRequest(
           toolName: 'create_calendar_event',
           parameters: {
@@ -81,14 +96,27 @@ class ChatService {
       );
       return ChatResponse(
         replyText: result.userDisplayMessage,
-        citedNotes: [],
+        citedNotes: const [],
       );
     }
 
-    // 3. 3-Way Grounded Retrieval (FTS + Vector + Knowledge Graph)
+    // 3. Autonomous Memory Recall Engine
+    if (_recallAgent != null) {
+      final recallResult = await _recallAgent.answer(message);
+      return ChatResponse(
+        replyText: recallResult.replyText,
+        citedNotes: recallResult.citedNotes,
+        graphTriples: recallResult.graphTriples,
+        questionType: recallResult.questionType,
+        isClarification: recallResult.isClarification,
+        candidateOptions: recallResult.candidateOptions,
+        sourceNoteIds: recallResult.sourceNoteIds,
+        contextPath: recallResult.contextPath,
+      );
+    }
+
+    // Fallback Grounded Retrieval
     final searchResults = await _hybridRetriever.retrieve(message, limit: 3);
-    
-    // 4. Build Grounded Context: Notes + Entities + Graph Triples + Tasks
     final groundedContext = await _contextBuilder.buildContext(searchResults);
 
     String? llmAnswer;
@@ -104,18 +132,21 @@ class ChatService {
         replyText: llmAnswer,
         citedNotes: searchResults,
         graphTriples: groundedContext.graphTriples,
+        sourceNoteIds: groundedContext.sourceNoteIds,
       );
     }
 
     if (searchResults.isNotEmpty) {
       final topNote = searchResults.first.note;
-      final tripleInfo = groundedContext.graphTriples.isNotEmpty
-          ? '\n(Fact: ${groundedContext.graphTriples.first})'
-          : '';
+      final contextLabel = searchResults.first.contextName ?? topNote.title;
+      final dateLabel = DateFormat('MMM d').format(topNote.createdAt);
+      final noteRef = '$dateLabel · $contextLabel';
       return ChatResponse(
-        replyText: 'Based on your memory: "${topNote.summary ?? topNote.content}"$tripleInfo',
+        replyText:
+            'Based on your memory ($noteRef): "${topNote.summary ?? topNote.content}"',
         citedNotes: searchResults,
         graphTriples: groundedContext.graphTriples,
+        sourceNoteIds: [topNote.id],
       );
     }
 

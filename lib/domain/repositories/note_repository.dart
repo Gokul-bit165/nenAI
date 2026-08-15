@@ -9,6 +9,9 @@ abstract class NoteRepository {
   /// Reactively emits the full list of notes, newest first.
   Stream<List<Note>> watchAllNotes();
 
+  /// Fetches all notes.
+  Future<List<Note>> getAllNotes();
+
   /// Reactively emits notes belonging to a specific cluster.
   Stream<List<Note>> watchNotesByCluster(String clusterId);
 

@@ -22,13 +22,24 @@ class MainActivity : FlutterActivity() {
                         putExtra(AlarmClock.EXTRA_HOUR, hour)
                         putExtra(AlarmClock.EXTRA_MINUTES, minute)
                         putExtra(AlarmClock.EXTRA_MESSAGE, message)
-                        putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                        putExtra(AlarmClock.EXTRA_SKIP_UI, false)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
                     result.success(true)
                 } catch (e: Exception) {
-                    result.error("ALARM_ERROR", e.message, null)
+                    try {
+                        val fallbackIntent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                            putExtra(AlarmClock.EXTRA_HOUR, hour)
+                            putExtra(AlarmClock.EXTRA_MINUTES, minute)
+                            putExtra(AlarmClock.EXTRA_MESSAGE, message)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(fallbackIntent)
+                        result.success(true)
+                    } catch (e2: Exception) {
+                        result.error("ALARM_ERROR", e2.message, null)
+                    }
                 }
             } else {
                 result.notImplemented()

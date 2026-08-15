@@ -23,6 +23,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
 
   // ── One-shot queries ───────────────────────────────────────────────────────
 
+  Future<List<NotesTableData>> getAllNotes() => select(notesTable).get();
+
   Future<NotesTableData?> getById(String id) =>
       (select(notesTable)..where((t) => t.id.equals(id))).getSingleOrNull();
 

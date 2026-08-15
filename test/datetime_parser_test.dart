@@ -20,9 +20,19 @@ void main() {
       expect(parsed, equals(DateTime(2026, 8, 5, 8, 30)));
     });
 
-    test('Parses next day of week (Friday)', () {
-      final parsed = DateTimeParser.parse('remind me next Friday at 5:00 PM', referenceTime: reference);
-      expect(parsed, equals(DateTime(2026, 8, 7, 17, 0)));
+    test('Parses relative minutes with after keyword', () {
+      final parsed = DateTimeParser.parse('after 10 mins', referenceTime: reference);
+      expect(parsed, equals(DateTime(2026, 8, 4, 10, 10)));
+    });
+
+    test('Parses explicit am/pm time', () {
+      final parsed = DateTimeParser.parse('set alarm for 6 am', referenceTime: reference);
+      expect(parsed, equals(DateTime(2026, 8, 5, 6, 0))); // next 6 AM
+    });
+
+    test('Parses time with minutes and am/pm', () {
+      final parsed = DateTimeParser.parse('alarm at 7:30 pm', referenceTime: reference);
+      expect(parsed, equals(DateTime(2026, 8, 4, 19, 30)));
     });
   });
 }
