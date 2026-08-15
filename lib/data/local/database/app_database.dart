@@ -92,6 +92,13 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.createTable(pendingResolutionsTable);
           }
+          if (from < 7) {
+            // Add inferenceType to existing relationships (defaults to 'extracted')
+            await m.addColumn(
+              relationshipsTable,
+              relationshipsTable.inferenceType as GeneratedColumn<Object>,
+            );
+          }
         },
       );
 

@@ -31,6 +31,8 @@ import 'ai/memory/reference_resolver.dart';
 import 'ai/memory/context_evolution_engine.dart';
 import 'ai/memory/context_timeline_service.dart';
 import 'ai/memory/memory_correction_service.dart';
+import 'ai/memory/relationship_evidence_builder.dart';
+import 'ai/memory/temporal_memory_retriever.dart';
 import 'ai/chat/chat_service.dart';
 
 import 'background/note_processing_isolate.dart';
@@ -189,6 +191,21 @@ Future<void> configureDependencies() async {
   );
   getIt.registerSingleton<MemoryCorrectionService>(memoryCorrectionService);
 
+  // RelationshipEvidenceBuilder — builds entity evidence bundles before context scoring
+  final relationshipEvidenceBuilder = RelationshipEvidenceBuilder(
+    entitiesDao: db.entities,
+    relationshipsDao: db.relationships,
+  );
+  getIt.registerSingleton<RelationshipEvidenceBuilder>(relationshipEvidenceBuilder);
+
+  // TemporalMemoryRetriever — answers 'Summarize today' / 'This week' queries
+  final temporalMemoryRetriever = TemporalMemoryRetriever(
+    noteRepository: repository,
+    contextRepository: contextRepository,
+    tasksDao: db.tasks,
+  );
+  getIt.registerSingleton<TemporalMemoryRetriever>(temporalMemoryRetriever);
+
   // MCP Tool System
   final toolRegistry = ToolRegistry();
   toolRegistry.registerTool(SearchMemoriesTool(hybridRetriever));
@@ -213,6 +230,7 @@ Future<void> configureDependencies() async {
     entitiesDao: db.entities,
     relationshipsDao: db.relationships,
     tasksDao: db.tasks,
+    temporalMemoryRetriever: temporalMemoryRetriever,
   );
   getIt.registerSingleton<MemoryRecallAgent>(memoryRecallAgent);
 
@@ -229,7 +247,7 @@ Future<void> configureDependencies() async {
     ),
   );
 
-  // Autonomous Memory Engine Pipeline (13-Stage Pipeline)
+  // Autonomous Memory Engine Pipeline (13-Stage Pipeline + RelationshipEvidenceBuilder)
   getIt.registerSingleton<NoteProcessingIsolate>(
     NoteProcessingIsolate(
       repository: repository,
@@ -242,6 +260,7 @@ Future<void> configureDependencies() async {
       memoryRouter: memoryRouter,
       memoryLinker: memoryLinker,
       clusteringManager: clusteringManager,
+      relationshipEvidenceBuilder: relationshipEvidenceBuilder,
     ),
   );
 

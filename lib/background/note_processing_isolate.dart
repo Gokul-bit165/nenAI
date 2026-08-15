@@ -10,6 +10,7 @@ import '../ai/agents/memory_router.dart';
 import '../ai/memory/context_candidate_retriever.dart';
 import '../ai/memory/reference_resolver.dart';
 import '../ai/memory/memory_linker.dart';
+import '../ai/memory/relationship_evidence_builder.dart';
 import 'clustering_manager.dart';
 
 /// Complete NENAI Autonomous Memory Formation Pipeline (Write Flow).
@@ -29,6 +30,7 @@ class NoteProcessingIsolate {
     required MemoryRouter memoryRouter,
     required MemoryLinker memoryLinker,
     required ClusteringManager clusteringManager,
+    RelationshipEvidenceBuilder? relationshipEvidenceBuilder,
   })  : _repository = repository,
         _understandingAgent = understandingAgent,
         _entityResolver = entityResolver,
@@ -38,7 +40,8 @@ class NoteProcessingIsolate {
         _memoryReasoner = memoryReasoner,
         _memoryRouter = memoryRouter,
         _memoryLinker = memoryLinker,
-        _clusteringManager = clusteringManager;
+        _clusteringManager = clusteringManager,
+        _relationshipEvidenceBuilder = relationshipEvidenceBuilder;
 
   final NoteRepository _repository;
   final UnderstandingAgent _understandingAgent;
@@ -50,6 +53,7 @@ class NoteProcessingIsolate {
   final MemoryRouter _memoryRouter;
   final MemoryLinker _memoryLinker;
   final ClusteringManager _clusteringManager;
+  final RelationshipEvidenceBuilder? _relationshipEvidenceBuilder;
 
   Future<void> processNote(String noteId) async {
     // 1. SAVE: Note already persisted in repository
@@ -70,6 +74,11 @@ class NoteProcessingIsolate {
       final analysis = await _understandingAgent.understand(note.content);
 
       if (analysis != null) {
+        // 2.5 ENTITY EVIDENCE: Build relationship evidence bundles before context scoring
+        final entityEvidences = await _relationshipEvidenceBuilder
+                ?.buildEvidenceFor(analysis, noteTimestamp: note.createdAt) ??
+            const [];
+
         // 3. RETRIEVE CONTEXT: Multi-signal candidate retrieval across context hierarchy
         final candidates = await _contextCandidateRetriever.retrieveCandidates(
           CandidateRetrievalQuery(
@@ -77,6 +86,7 @@ class NoteProcessingIsolate {
             analysisResult: analysis,
             noteTimestamp: note.createdAt,
             topK: 5,
+            entityEvidences: entityEvidences,
           ),
         );
 

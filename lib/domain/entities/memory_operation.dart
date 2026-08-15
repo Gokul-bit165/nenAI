@@ -217,6 +217,7 @@ class MemoryOperation {
     required String targetEntityId,
     required String sourceMemoryId,
     double confidence = 1.0,
+    String inferenceType = 'extracted',
   }) =>
       MemoryOperation(
         type: OperationType.createRelationship,
@@ -227,6 +228,7 @@ class MemoryOperation {
           'targetEntityId': targetEntityId,
           'sourceMemoryId': sourceMemoryId,
           'confidence': confidence,
+          'inferenceType': inferenceType,
         },
       );
 

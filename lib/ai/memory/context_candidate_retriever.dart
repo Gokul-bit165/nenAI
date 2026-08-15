@@ -3,6 +3,7 @@ import '../../data/local/database/app_database.dart';
 import '../../domain/ai/context_candidate.dart';
 import '../../domain/repositories/context_repository.dart';
 import '../../core/utils/vector_math.dart';
+import 'relationship_evidence_builder.dart';
 
 /// Context Candidate Retriever: Retrieves and scores existing hierarchical contexts
 /// for incoming notes using multi-signal retrieval without LLM database scans.
@@ -246,6 +247,33 @@ class ContextCandidateRetriever {
     if (isUserConfirmed) {
       totalScore = math.min(1.0, totalScore + 0.30);
       matchedSignals.add('User-confirmed preference for this context lineage');
+    }
+
+    totalScore = totalScore.clamp(0.0, 1.0);
+
+    // ── Signal 7: Entity Evidence Boost ──────────────────────────────────────
+    // If the incoming note has pre-computed entity evidences, boost this candidate
+    // when those entities are known to appear in its context lineage.
+    double evidenceBoost = 0.0;
+    final evidences = query.entityEvidences.whereType<EntityEvidence>().toList();
+    for (final ev in evidences) {
+      // Check if this entity's linked memory IDs overlap with this context's notes
+      final overlap = ev.linkedMemoryIds.any((mid) => memoryIds.contains(mid));
+      if (overlap) {
+        evidenceBoost += ev.matchConfidence * 0.40;
+        matchedSignals.add(
+          'KG entity "${ev.entityName}" confirmed in context lineage (conf: ${ev.matchConfidence.toStringAsFixed(2)})',
+        );
+      }
+      // Also boost if entity name matches any node in the context path
+      final entityNameLower = ev.entityName.toLowerCase();
+      if (pathNodeNames.any((p) => p.toLowerCase().contains(entityNameLower))) {
+        evidenceBoost += ev.matchConfidence * 0.25;
+        matchedSignals.add('KG entity "${ev.entityName}" matches context path node');
+      }
+    }
+    if (evidenceBoost > 0) {
+      totalScore = math.min(1.0, totalScore + evidenceBoost);
     }
 
     totalScore = totalScore.clamp(0.0, 1.0);

@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../memory/hybrid_retriever.dart';
 import '../memory/memory_context_builder.dart';
 import '../agents/query_understanding_agent.dart';
@@ -137,8 +138,12 @@ class ChatService {
 
     if (searchResults.isNotEmpty) {
       final topNote = searchResults.first.note;
+      final contextLabel = searchResults.first.contextName ?? topNote.title;
+      final dateLabel = DateFormat('MMM d').format(topNote.createdAt);
+      final noteRef = '$dateLabel · $contextLabel';
       return ChatResponse(
-        replyText: 'Based on your memory: "${topNote.summary ?? topNote.content}" [Source Note: ${topNote.id}]',
+        replyText:
+            'Based on your memory ($noteRef): "${topNote.summary ?? topNote.content}"',
         citedNotes: searchResults,
         graphTriples: groundedContext.graphTriples,
         sourceNoteIds: [topNote.id],

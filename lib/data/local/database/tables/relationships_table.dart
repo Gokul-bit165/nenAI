@@ -22,6 +22,10 @@ class RelationshipsTable extends Table {
   /// Confidence score (0.0 to 1.0)
   RealColumn get confidence => real().withDefault(const Constant(1.0))();
 
+  /// How this relationship was established: 'extracted' (from note text),
+  /// 'inferred' (cross-note graph traversal), or 'user_confirmed'.
+  TextColumn get inferenceType => text().withDefault(const Constant('extracted'))();
+
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
 

@@ -1,18 +1,22 @@
 /// The discrete decision made by the Context Resolution Engine.
 enum ResolutionOutcome {
-  /// High confidence with sufficient margin: automatically attach memory to target context.
+  /// HIGH confidence ≥ 0.80 with sufficient margin: automatically attach memory.
   autoAttach,
 
   /// High confidence across multiple non-conflicting valid parent contexts (DAG attachment).
   multiAttach,
 
-  /// Competing candidate contexts with low margin: user disambiguation required.
+  /// MEDIUM confidence 0.55–0.79: save note but show soft suggestion card ("Where should this belong?").
+  /// Stored as a pending resolution — non-blocking, user decides at their own pace.
+  pendingReview,
+
+  /// Competing candidate contexts with near-equal scores: user disambiguation required.
   ambiguous,
 
   /// Memory represents a new episode, project, or topic that should be initialized as a new context.
   newContext,
 
-  /// Incomplete or dangling references with low confidence: kept unassigned without guessing.
+  /// LOW confidence < 0.55: saved unlinked, no context attached, no prompt shown.
   unresolved,
 
   /// Trivial, transient, or scratchpad content not requiring contextual graph binding.

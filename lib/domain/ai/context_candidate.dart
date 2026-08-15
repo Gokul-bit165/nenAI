@@ -108,6 +108,7 @@ class CandidateRetrievalQuery {
     required this.noteTimestamp,
     this.embedding,
     this.topK = 5,
+    this.entityEvidences = const [],
   });
 
   final String noteText;
@@ -115,4 +116,8 @@ class CandidateRetrievalQuery {
   final DateTime noteTimestamp;
   final List<double>? embedding;
   final int topK;
+
+  /// Pre-computed entity evidence bundles from [RelationshipEvidenceBuilder].
+  /// Used to boost context candidates that share confirmed KG entities.
+  final List<dynamic> entityEvidences;
 }

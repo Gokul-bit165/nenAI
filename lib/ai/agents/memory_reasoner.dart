@@ -1,4 +1,4 @@
-import 'package:uuid/uuid.dart';
+﻿import 'package:uuid/uuid.dart';
 import '../../core/nlp/datetime_parser.dart';
 import '../../data/local/database/daos/relationships_dao.dart';
 import '../../domain/ai/context_candidate.dart';
@@ -8,7 +8,14 @@ import '../../domain/ai/reference_resolution.dart';
 import '../../domain/entities/memory_operation.dart';
 
 /// Memory Reasoner: Synthesizes note analysis, resolved entities, cross-note references,
-/// and hierarchical context candidates into a structured list of atomic memory operations.
+/// and hierarchical context candidates into structured atomic memory operations.
+///
+/// V4 Changes:
+/// - Removed ALL hardcoded keyword pattern checks (no more .contains('deployment')).
+/// - Child context creation is now entity-driven: triggered by ContextualActions and
+///   their subjects matching entities in the current context lineage.
+/// - Added handler for ResolutionOutcome.pendingReview (medium confidence).
+/// - inferenceType metadata added to all relationship operations.
 class MemoryReasoner {
   MemoryReasoner(this._relationshipsDao);
 
@@ -53,91 +60,74 @@ class MemoryReasoner {
               ),
             );
 
-            final noteTextLower = noteText.toLowerCase();
+            // Entity-driven child context creation:
+            // For each contextual action, if its subject resolves to a known entity
+            // that is NOT already the current context's name, create a child context.
+            for (final action in analysis.actions) {
+              final subjectLower = action.subject.toLowerCase().trim();
+              if (subjectLower.isEmpty ||
+                  subjectLower == 'this' ||
+                  subjectLower == 'it') continue;
 
-            // 1. Check if note introduces "Testing" under "Deployment"
-            if ((analysis.actions.any((a) => a.subject.toLowerCase() == 'testing') ||
-                    noteTextLower.contains('test this') ||
-                    noteTextLower.contains('testing')) &&
-                (contextResolution.targetContextName?.toLowerCase().contains('deployment') ?? false)) {
-              final childId = 'ctx-test-${_uuid.v4().substring(0, 8)}';
-              operations.add(
-                MemoryOperation.createChildContext(
-                  id: childId,
-                  parentContextId: contextResolution.targetContextId!,
-                  childName: 'Testing',
-                  childType: 'activity',
-                  relationType: 'activity',
-                  originatingMemoryId: noteId,
-                ),
-              );
-              operations.add(
-                MemoryOperation.attachMemory(
-                  memoryId: noteId,
-                  contextId: childId,
-                  contextName: 'Testing',
-                  role: 'child_activity',
-                  confidence: contextResolution.confidence,
-                ),
-              );
-            }
-            // 2. Check if note introduces "API failure" / Issue under "Testing" or "Deployment"
-            else if ((noteTextLower.contains('failed') ||
-                    noteTextLower.contains('500') ||
-                    noteTextLower.contains('api failure') ||
-                    noteTextLower.contains('error')) &&
-                ((contextResolution.targetContextName?.toLowerCase().contains('testing') ?? false) ||
-                    (contextResolution.targetContextName?.toLowerCase().contains('deployment') ?? false))) {
-              final childId = 'ctx-issue-${_uuid.v4().substring(0, 8)}';
-              final issueName = noteTextLower.contains('500') || noteTextLower.contains('api')
-                  ? 'API failure'
-                  : 'Testing Issue';
+              final parentNameLower =
+                  contextResolution.targetContextName?.toLowerCase() ?? '';
 
-              operations.add(
-                MemoryOperation.createChildContext(
-                  id: childId,
-                  parentContextId: contextResolution.targetContextId!,
-                  childName: issueName,
-                  childType: 'task',
-                  relationType: 'issue_investigation',
-                  originatingMemoryId: noteId,
-                ),
-              );
-              operations.add(
-                MemoryOperation.attachMemory(
-                  memoryId: noteId,
-                  contextId: childId,
-                  contextName: issueName,
-                  role: 'issue_context',
-                  confidence: contextResolution.confidence,
-                ),
-              );
+              // Only create child if subject is meaningfully different from parent
+              if (!parentNameLower.contains(subjectLower) &&
+                  !subjectLower.contains(parentNameLower)) {
+                // Check action type to determine child context type
+                final childType = _childContextType(action.type);
+                final childName = _capitalise(action.subject);
+                final childId =
+                    'ctx-${subjectLower.replaceAll(' ', '-')}-${_uuid.v4().substring(0, 6)}';
+
+                operations.add(
+                  MemoryOperation.createChildContext(
+                    id: childId,
+                    parentContextId: contextResolution.targetContextId!,
+                    childName: childName,
+                    childType: childType,
+                    relationType: action.type,
+                    originatingMemoryId: noteId,
+                  ),
+                );
+                operations.add(
+                  MemoryOperation.attachMemory(
+                    memoryId: noteId,
+                    contextId: childId,
+                    contextName: childName,
+                    role: 'child_activity',
+                    confidence: contextResolution.confidence * 0.9,
+                  ),
+                );
+              }
             }
-            // 3. Check if note introduces "Deployment" under a Project
-            else if ((analysis.actions.any((a) => a.subject.toLowerCase() == 'deployment') ||
-                    noteTextLower.contains('deployment')) &&
-                (contextResolution.targetContextName?.toLowerCase() != 'deployment')) {
-              final childId = 'ctx-deploy-${_uuid.v4().substring(0, 8)}';
-              operations.add(
-                MemoryOperation.createChildContext(
-                  id: childId,
-                  parentContextId: contextResolution.targetContextId!,
-                  childName: 'Deployment',
-                  childType: 'activity',
-                  relationType: 'activity',
-                  originatingMemoryId: noteId,
-                ),
-              );
-              operations.add(
-                MemoryOperation.attachMemory(
-                  memoryId: noteId,
-                  contextId: childId,
-                  contextName: 'Deployment',
-                  role: 'child_activity',
-                  confidence: contextResolution.confidence,
-                ),
-              );
-            }
+          }
+          break;
+
+        case ResolutionOutcome.pendingReview:
+          // MEDIUM confidence: save unlinked but store pending resolution for soft UI card.
+          if (contextResolution.targetContextId != null) {
+            final candidatesPayload = contextResolution.candidateBreakdowns
+                .take(3)
+                .map((c) => {
+                      'contextId': c.candidateId,
+                      'contextName': c.candidateName,
+                      'contextPath': c.contextPath,
+                      'confidence': c.finalScore,
+                      'evidenceSummary': c.evidenceSnippet ??
+                          'Medium-confidence context suggestion.',
+                    })
+                .toList();
+
+            operations.add(
+              MemoryOperation.requestClarification(
+                memoryId: noteId,
+                noteTextSnippet:
+                    noteText.length > 100 ? '${noteText.substring(0, 97)}...' : noteText,
+                candidates: candidatesPayload,
+              ),
+            );
           }
           break;
 
@@ -180,7 +170,8 @@ class MemoryReasoner {
 
         case ResolutionOutcome.newContext:
           final newId = 'ctx-${_uuid.v4().substring(0, 8)}';
-          final newName = contextResolution.suggestedNewContextName ?? analysis.topic;
+          final newName =
+              contextResolution.suggestedNewContextName ?? analysis.topic;
           final newType = contextResolution.suggestedNewContextType ?? 'project';
 
           operations.add(
@@ -210,7 +201,8 @@ class MemoryReasoner {
                     'contextName': c.candidateName,
                     'contextPath': c.contextPath,
                     'confidence': c.finalScore,
-                    'evidenceSummary': c.evidenceSnippet ?? 'Competing context candidate.',
+                    'evidenceSummary':
+                        c.evidenceSnippet ?? 'Competing context candidate.',
                   })
               .toList();
 
@@ -227,7 +219,8 @@ class MemoryReasoner {
         case ResolutionOutcome.ignore:
           operations.add(
             MemoryOperation.noOp(
-              reason: 'Memory context resolution outcome: ${contextResolution.outcome.name}',
+              reason:
+                  'Memory context resolution outcome: ${contextResolution.outcome.name}',
             ),
           );
           break;
@@ -251,7 +244,7 @@ class MemoryReasoner {
       }
     }
 
-    // 3. Process Facts / Relationships
+    // 3. Process Facts / Relationships � with inferenceType metadata
     for (final fact in analysis.facts) {
       final source = _findResolved(fact.subject, entityMap);
       final target = _findResolved(fact.object, entityMap);
@@ -266,7 +259,8 @@ class MemoryReasoner {
         if (existingEdge != null) {
           operations.add(
             MemoryOperation.noOp(
-              reason: 'Relationship ${source.name} --${fact.predicate}--> ${target.name} already exists',
+              reason:
+                  'Relationship ${source.name} --${fact.predicate}--> ${target.name} already exists',
             ),
           );
         } else {
@@ -278,13 +272,42 @@ class MemoryReasoner {
               targetEntityId: target.entityId,
               sourceMemoryId: noteId,
               confidence: fact.confidence,
+              inferenceType: 'extracted',
             ),
           );
         }
       }
     }
 
-    // 4. Process Tasks
+    // 4. Process Explicit Relationships (from analysis.explicitRelationships)
+    for (final rel in analysis.explicitRelationships) {
+      final source = _findResolved(rel.source, entityMap);
+      final target = _findResolved(rel.target, entityMap);
+
+      if (source != null && target != null && source.entityId != target.entityId) {
+        final existingEdge = await _relationshipsDao.findExactRelationship(
+          sourceEntityId: source.entityId,
+          relation: rel.relation,
+          targetEntityId: target.entityId,
+        );
+
+        if (existingEdge == null) {
+          operations.add(
+            MemoryOperation.createRelationship(
+              id: _uuid.v4(),
+              sourceEntityId: source.entityId,
+              relation: rel.relation,
+              targetEntityId: target.entityId,
+              sourceMemoryId: noteId,
+              confidence: rel.confidence,
+              inferenceType: 'extracted',
+            ),
+          );
+        }
+      }
+    }
+
+    // 5. Process Tasks
     for (final task in analysis.tasks) {
       int? dueTimestamp;
       if (task.time != null && task.time!.isNotEmpty) {
@@ -317,4 +340,24 @@ class MemoryReasoner {
     }
     return null;
   }
+
+  /// Maps action type strings to child context types.
+  String _childContextType(String actionType) {
+    switch (actionType.toLowerCase()) {
+      case 'completed':
+      case 'in_progress':
+        return 'activity';
+      case 'planned':
+      case 'scheduled':
+        return 'milestone';
+      case 'issue':
+      case 'bug':
+        return 'task';
+      default:
+        return 'activity';
+    }
+  }
+
+  String _capitalise(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }

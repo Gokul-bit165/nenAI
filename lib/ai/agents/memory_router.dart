@@ -271,6 +271,7 @@ class MemoryRouter {
           final targetEntityId = op.payload['targetEntityId'] as String;
           final sourceMemoryId = op.payload['sourceMemoryId'] as String;
           final confidence = (op.payload['confidence'] as num?)?.toDouble() ?? 1.0;
+          // inferenceType stored in payload for audit; DB default 'extracted' is used if not in companion
 
           await _db.relationships.upsertRelationship(
             RelationshipsTableCompanion.insert(

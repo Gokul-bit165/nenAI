@@ -7,7 +7,7 @@ class AppConstants {
 
   // ── Database ─────────────────────────────────────────────────────────────
   static const String dbName = 'nenai.db';
-  static const int dbVersion = 6;
+  static const int dbVersion = 7;
 
   // ── Model files (relative to assets/models/) ──────────────────────────────
   static const String embeddingModelAsset = 'assets/models/embedding_model.onnx';
