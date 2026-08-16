@@ -185,6 +185,63 @@ class ExplicitRelationshipCandidate {
       'ExplicitRelationshipCandidate($source --$relation--> $target)';
 }
 
+/// Explicit memory correction — retracts an old KG edge and asserts a new one.
+///
+/// Detected from markers like:
+///   "actually", "no wait", "not X but Y", "I meant", "correction",
+///   "that was for FC not ReadSmart"
+///
+/// The LLM extracts the semantic subject/predicate/old/new tuple.
+/// Example: "that deployment was for FC, not ReadSmart AI" →
+///   subject=deployment, predicate=belongs_to, oldObject=ReadSmart AI, newObject=FC
+class ExtractedCorrection {
+  const ExtractedCorrection({
+    required this.subject,
+    required this.predicate,
+    required this.oldObject,
+    required this.newObject,
+    this.confidence = 1.0,
+  });
+
+  /// The entity being corrected. E.g. "deployment"
+  final String subject;
+
+  /// The relationship type being corrected. E.g. "belongs_to"
+  final String predicate;
+
+  /// The previously stored (wrong) value. E.g. "ReadSmart AI"
+  final String oldObject;
+
+  /// The correct value to store instead. E.g. "FC"
+  final String newObject;
+
+  final double confidence;
+
+  factory ExtractedCorrection.fromJson(Map<String, dynamic> json) =>
+      ExtractedCorrection(
+        subject: (json['subject'] as String?)?.trim() ?? '',
+        predicate: (json['predicate'] as String?)?.trim().toLowerCase() ?? 'relates_to',
+        oldObject: (json['oldObject'] as String?)?.trim() ?? '',
+        newObject: (json['newObject'] as String?)?.trim() ?? '',
+        confidence: (json['confidence'] as num?)?.toDouble() ?? 1.0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'subject': subject,
+        'predicate': predicate,
+        'oldObject': oldObject,
+        'newObject': newObject,
+        'confidence': confidence,
+      };
+
+  bool get isValid =>
+      subject.isNotEmpty && oldObject.isNotEmpty && newObject.isNotEmpty;
+
+  @override
+  String toString() =>
+      'ExtractedCorrection($subject.$predicate: $oldObject → $newObject)';
+}
+
 /// The comprehensive structured output of the Context-Aware Understanding Agent.
 class NoteAnalysisResult {
   const NoteAnalysisResult({
@@ -205,6 +262,7 @@ class NoteAnalysisResult {
     this.possibleParentContext,
     this.possibleChildContext,
     this.explicitRelationships = const [],
+    this.corrections = const [],
   });
 
   /// Short (3–5 word) primary topic label.
@@ -257,6 +315,10 @@ class NoteAnalysisResult {
 
   /// Explicit relationships between entities.
   final List<ExplicitRelationshipCandidate> explicitRelationships;
+
+  /// Explicit corrections to previously stored KG facts.
+  /// E.g. "actually that deployment was for FC, not ReadSmart AI"
+  final List<ExtractedCorrection> corrections;
 
   /// List of raw reference strings that are unresolved in the local note text.
   List<String> get unresolvedReferences => references

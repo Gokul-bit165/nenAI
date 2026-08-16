@@ -46,6 +46,7 @@ enum OperationType {
   linkContext,
   updateContext,
   createRelationship,
+  correctRelationship,
   createTask,
   mergeContext,
   splitContext,
@@ -229,6 +230,24 @@ class MemoryOperation {
           'sourceMemoryId': sourceMemoryId,
           'confidence': confidence,
           'inferenceType': inferenceType,
+        },
+      );
+
+  factory MemoryOperation.correctRelationship({
+    required String sourceEntityId,
+    required String relation,
+    required String oldTargetEntityId,
+    required String newTargetEntityId,
+    required String sourceMemoryId,
+  }) =>
+      MemoryOperation(
+        type: OperationType.correctRelationship,
+        payload: {
+          'sourceEntityId': sourceEntityId,
+          'relation': relation,
+          'oldTargetEntityId': oldTargetEntityId,
+          'newTargetEntityId': newTargetEntityId,
+          'sourceMemoryId': sourceMemoryId,
         },
       );
 

@@ -1,4 +1,4 @@
-﻿import 'package:uuid/uuid.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/nlp/datetime_parser.dart';
 import '../../data/local/database/daos/relationships_dao.dart';
 import '../../domain/ai/context_candidate.dart';
@@ -304,6 +304,26 @@ class MemoryReasoner {
             ),
           );
         }
+      }
+    }
+
+    // 4b. Process Explicit Corrections (from analysis.corrections)
+    for (final corr in analysis.corrections) {
+      if (!corr.isValid) continue;
+      final source = _findResolved(corr.subject, entityMap);
+      final oldTarget = _findResolved(corr.oldObject, entityMap);
+      final newTarget = _findResolved(corr.newObject, entityMap);
+
+      if (source != null && oldTarget != null && newTarget != null) {
+        operations.add(
+          MemoryOperation.correctRelationship(
+            sourceEntityId: source.entityId,
+            relation: corr.predicate,
+            oldTargetEntityId: oldTarget.entityId,
+            newTargetEntityId: newTarget.entityId,
+            sourceMemoryId: noteId,
+          ),
+        );
       }
     }
 

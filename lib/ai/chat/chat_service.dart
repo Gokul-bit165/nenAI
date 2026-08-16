@@ -1,8 +1,10 @@
 import 'package:intl/intl.dart';
 import '../memory/hybrid_retriever.dart';
 import '../memory/memory_context_builder.dart';
+import '../memory/kg_query_engine.dart';
 import '../agents/query_understanding_agent.dart';
 import '../agents/memory_recall_agent.dart';
+import '../services/minimal_memory_understanding_service.dart';
 import '../../mcp/tool_executor.dart';
 import '../../mcp/tool_registry.dart';
 import '../../mcp/tool_protocol.dart';
@@ -19,6 +21,7 @@ class ChatResponse {
     this.candidateOptions = const [],
     this.sourceNoteIds = const [],
     this.contextPath,
+    this.formationTriggered = false,
   });
 
   final String replyText;
@@ -30,6 +33,9 @@ class ChatResponse {
   final List<String> candidateOptions;
   final List<String> sourceNoteIds;
   final String? contextPath;
+
+  /// True if this message was classified as memory formation (create/add/update/correct/link/task).
+  final bool formationTriggered;
 }
 
 class ChatService {
@@ -41,13 +47,17 @@ class ChatService {
     required ToolExecutor toolExecutor,
     required NoteIntelligenceEngine intelligenceEngine,
     MemoryRecallAgent? recallAgent,
+    KGQueryEngine? kgQueryEngine,
+    MinimalMemoryUnderstandingService? minimalUnderstandingService,
   })  : _hybridRetriever = hybridRetriever,
         _contextBuilder = contextBuilder,
         _queryAgent = queryAgent,
         _toolRegistry = toolRegistry,
         _toolExecutor = toolExecutor,
         _intelligenceEngine = intelligenceEngine,
-        _recallAgent = recallAgent;
+        _recallAgent = recallAgent,
+        _kgQueryEngine = kgQueryEngine,
+        _minimalUnderstandingService = minimalUnderstandingService;
 
   final HybridRetriever _hybridRetriever;
   final MemoryContextBuilder _contextBuilder;
@@ -56,9 +66,14 @@ class ChatService {
   final ToolExecutor _toolExecutor;
   final NoteIntelligenceEngine _intelligenceEngine;
   final MemoryRecallAgent? _recallAgent;
+  final KGQueryEngine? _kgQueryEngine;
+  final MinimalMemoryUnderstandingService? _minimalUnderstandingService;
 
-  Future<ChatResponse> handleUserMessage(String message) async {
-    // 1. Query Understanding & Intent Analysis
+  Future<ChatResponse> handleUserMessage(
+    String message, {
+    List<String>? conversationContext,
+  }) async {
+    // 1. Query Understanding & Intent Classification
     final queryAnalysis = await _queryAgent.analyzeQuery(message);
 
     // 2. Action Handlers (Alarms, Calendar, Stats)
@@ -100,7 +115,74 @@ class ChatService {
       );
     }
 
-    // 3. Autonomous Memory Recall Engine
+    // 3. Memory Formation Path (create, add, update, correct, link, task)
+    if (queryAnalysis.isFormation && _minimalUnderstandingService != null) {
+      final understanding = await _minimalUnderstandingService.understand(
+        message,
+        intent: queryAnalysis.memoryIntent,
+        conversationContext: conversationContext,
+      );
+
+      final intentName = queryAnalysis.memoryIntent.name;
+
+      if (understanding.isAmbiguous) {
+        final topic = understanding.analysis?.topic ?? 'this update';
+        final options = understanding.candidateBreakdowns
+            .take(3)
+            .map((c) => c.candidateName)
+            .toList();
+
+        return ChatResponse(
+          replyText: 'I understood "$topic". Which project is this for?',
+          citedNotes: const [],
+          isClarification: true,
+          candidateOptions: options,
+          formationTriggered: true,
+        );
+      }
+
+      if (understanding.isClear && understanding.targetContextName != null) {
+        final ctxName = understanding.targetContextName!;
+        final actionText = understanding.analysis?.actions.isNotEmpty == true
+            ? understanding.analysis!.actions.first.subject
+            : 'information';
+
+        return ChatResponse(
+          replyText: 'Got it — stored "$actionText" under $ctxName.',
+          citedNotes: const [],
+          formationTriggered: true,
+        );
+      }
+
+      return ChatResponse(
+        replyText: 'Got it — recorded that to your memory ($intentName).',
+        citedNotes: const [],
+        formationTriggered: true,
+      );
+    }
+
+    // 4. Memory Recall Path (KG-First → Autonomous Recall Agent → Hybrid Search)
+    if (_kgQueryEngine != null) {
+      final kgResult = await _kgQueryEngine.query(
+        message,
+        recentContext: conversationContext ?? const [],
+      );
+      if (kgResult != null) {
+        // Fetch cited notes for source evidence display
+        final citedNotes = kgResult.sourceNoteIds.isNotEmpty
+            ? await _hybridRetriever.retrieve(message, limit: 3)
+            : const <HybridSearchResult>[];
+
+        return ChatResponse(
+          replyText: kgResult.answer,
+          citedNotes: citedNotes,
+          graphTriples: kgResult.triples,
+          sourceNoteIds: kgResult.sourceNoteIds,
+        );
+      }
+    }
+
+    // 5. Autonomous Recall Agent Fallback
     if (_recallAgent != null) {
       final recallResult = await _recallAgent.answer(message);
       return ChatResponse(

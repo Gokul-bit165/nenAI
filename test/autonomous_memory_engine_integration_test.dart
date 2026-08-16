@@ -30,6 +30,7 @@ import 'package:nenai/ai/memory/hybrid_retriever.dart';
 import 'package:nenai/ai/memory/memory_context_builder.dart';
 import 'package:nenai/ai/memory/retrieval_planner.dart';
 import 'package:nenai/ai/memory/memory_correction_service.dart';
+import 'package:nenai/ai/memory/temporal_memory_retriever.dart';
 import 'package:nenai/ai/chat/chat_service.dart';
 import 'package:nenai/background/note_processing_isolate.dart';
 import 'package:nenai/background/clustering_manager.dart';
@@ -162,6 +163,11 @@ void main() {
       entitiesDao: db.entities,
       relationshipsDao: db.relationships,
       tasksDao: db.tasks,
+      temporalMemoryRetriever: TemporalMemoryRetriever(
+        noteRepository: noteRepository,
+        contextRepository: contextRepository,
+        tasksDao: db.tasks,
+      ),
     );
 
     correctionService = MemoryCorrectionService(

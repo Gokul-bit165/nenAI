@@ -13,6 +13,7 @@ import 'package:nenai/ai/memory/hybrid_retriever.dart';
 import 'package:nenai/ai/memory/memory_context_builder.dart';
 import 'package:nenai/ai/memory/context_timeline_service.dart';
 import 'package:nenai/ai/memory/reference_resolver.dart';
+import 'package:nenai/ai/memory/temporal_memory_retriever.dart';
 import 'package:nenai/ai/agents/memory_recall_agent.dart';
 import 'package:nenai/ai/agents/query_understanding_agent.dart';
 import 'package:nenai/ai/chat/chat_service.dart';
@@ -92,6 +93,11 @@ void main() {
       entitiesDao: db.entities,
       relationshipsDao: db.relationships,
       tasksDao: db.tasks,
+      temporalMemoryRetriever: TemporalMemoryRetriever(
+        noteRepository: noteRepository,
+        contextRepository: contextRepository,
+        tasksDao: db.tasks,
+      ),
     );
 
     final toolRegistry = ToolRegistry();

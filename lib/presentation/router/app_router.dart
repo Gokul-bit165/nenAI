@@ -10,6 +10,7 @@ import '../screens/calendar/calendar_screen.dart';
 import '../screens/topics/cluster_detail_screen.dart';
 import '../screens/explorer/memory_explorer_screen.dart';
 import '../screens/shell/main_shell_scaffold.dart';
+import '../screens/home/pending_review_screen.dart';
 
 abstract class AppRoutes {
   static const String home = '/';
@@ -21,6 +22,7 @@ abstract class AppRoutes {
   static const String explorer = '/explorer';
   static const String chat = '/chat';
   static const String calendar = '/calendar';
+  static const String pendingReview = '/pending-review';
 }
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -111,6 +113,11 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       path: AppRoutes.explorer,
       builder: (context, state) => const MemoryExplorerScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: AppRoutes.pendingReview,
+      builder: (context, state) => const PendingReviewScreen(),
     ),
   ],
 );

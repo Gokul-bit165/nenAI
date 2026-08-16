@@ -287,6 +287,38 @@ class MemoryRouter {
           );
           break;
 
+        case OperationType.correctRelationship:
+          final sourceEntityId = op.payload['sourceEntityId'] as String;
+          final relation = op.payload['relation'] as String;
+          final oldTargetEntityId = op.payload['oldTargetEntityId'] as String;
+          final newTargetEntityId = op.payload['newTargetEntityId'] as String;
+          final sourceMemoryId = op.payload['sourceMemoryId'] as String;
+
+          final oldEdge = await _db.relationships.findExactRelationship(
+            sourceEntityId: sourceEntityId,
+            relation: relation,
+            targetEntityId: oldTargetEntityId,
+          );
+
+          if (oldEdge != null) {
+            await _db.relationships.deleteRelationship(oldEdge.id);
+          }
+
+          final newEdgeId = _uuid.v4();
+          await _db.relationships.upsertRelationship(
+            RelationshipsTableCompanion.insert(
+              id: newEdgeId,
+              sourceEntityId: sourceEntityId,
+              relation: relation,
+              targetEntityId: newTargetEntityId,
+              sourceMemoryId: sourceMemoryId,
+              confidence: const Value(1.0),
+              createdAt: nowEpoch,
+              updatedAt: nowEpoch,
+            ),
+          );
+          break;
+
         case OperationType.createTask:
           final id = op.payload['id'] as String;
           final memoryId = op.payload['memoryId'] as String;

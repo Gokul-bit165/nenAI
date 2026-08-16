@@ -79,7 +79,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             tooltip: 'Topics',
             onPressed: () => context.push(AppRoutes.topics),
           ),
-          const SizedBox(width: 4),
+          // Pending Review badge — shows count of memories awaiting user clarification
+          if (pendingResolutions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Badge(
+                label: Text(
+                  '${pendingResolutions.length}',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: AppColors.electricViolet,
+                child: IconButton(
+                  icon: const Icon(Icons.psychology_alt_rounded, size: 24),
+                  tooltip: '${pendingResolutions.length} memor${pendingResolutions.length == 1 ? 'y needs' : 'ies need'} your input',
+                  onPressed: () => context.push(AppRoutes.pendingReview),
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 4),
         ],
       ),
       body: CustomScrollView(

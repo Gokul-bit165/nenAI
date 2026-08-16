@@ -37,6 +37,9 @@ import 'ai/chat/chat_service.dart';
 
 import 'background/note_processing_isolate.dart';
 import 'background/clustering_manager.dart';
+import 'ai/services/memory_capture_service.dart';
+import 'ai/memory/kg_query_engine.dart';
+import 'ai/services/minimal_memory_understanding_service.dart';
 
 import 'domain/usecases/create_note.dart';
 import 'domain/usecases/update_note.dart';
@@ -219,6 +222,21 @@ Future<void> configureDependencies() async {
   final toolExecutor = ToolExecutor(toolRegistry);
   getIt.registerSingleton<ToolExecutor>(toolExecutor);
 
+  // KG-First Query Engine
+  final kgQueryEngine = KGQueryEngine(db: db);
+  getIt.registerSingleton<KGQueryEngine>(kgQueryEngine);
+
+  // Minimal Memory Understanding Service (Synchronous stages 1-6 for Chat formation)
+  final minimalMemoryUnderstandingService = MinimalMemoryUnderstandingService(
+    understandingAgent: understandingAgent,
+    entityResolver: entityResolver,
+    contextCandidateRetriever: contextCandidateRetriever,
+    contextResolutionAgent: contextResolutionAgent,
+    referenceResolver: referenceResolver,
+    relationshipEvidenceBuilder: relationshipEvidenceBuilder,
+  );
+  getIt.registerSingleton<MinimalMemoryUnderstandingService>(minimalMemoryUnderstandingService);
+
   final memoryRecallAgent = MemoryRecallAgent(
     db: db,
     contextRepository: contextRepository,
@@ -231,6 +249,7 @@ Future<void> configureDependencies() async {
     relationshipsDao: db.relationships,
     tasksDao: db.tasks,
     temporalMemoryRetriever: temporalMemoryRetriever,
+    kgQueryEngine: kgQueryEngine,
   );
   getIt.registerSingleton<MemoryRecallAgent>(memoryRecallAgent);
 
@@ -244,6 +263,8 @@ Future<void> configureDependencies() async {
       toolExecutor: toolExecutor,
       intelligenceEngine: getIt<NoteIntelligenceEngine>(),
       recallAgent: memoryRecallAgent,
+      kgQueryEngine: kgQueryEngine,
+      minimalUnderstandingService: minimalMemoryUnderstandingService,
     ),
   );
 
@@ -261,6 +282,16 @@ Future<void> configureDependencies() async {
       memoryLinker: memoryLinker,
       clusteringManager: clusteringManager,
       relationshipEvidenceBuilder: relationshipEvidenceBuilder,
+    ),
+  );
+
+  // MemoryCaptureService — unified entry point for note + chat memory analysis
+  // Registered as app-level singleton so its clarificationEvents stream lives beyond
+  // screen lifecycle — ChatNotifier subscribes at construction time, not screen mount.
+  getIt.registerSingleton<MemoryCaptureService>(
+    MemoryCaptureService(
+      noteProcessingIsolate: getIt<NoteProcessingIsolate>(),
+      db: db,
     ),
   );
 

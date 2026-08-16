@@ -48,6 +48,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final state = ref.watch(chatProvider);
     final notifier = ref.watch(chatProvider.notifier);
 
+    // Scroll to bottom whenever new messages arrive.
+    ref.listen<ChatState>(chatProvider, (_, next) {
+      if (next.messages.isNotEmpty) _scrollToBottom();
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -246,8 +251,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessageItem(
       BuildContext context, ChatMessage message, ChatNotifier notifier) {
+    // ── Gate 2: inline clarification bubble ──────────────────────────────────
+    if (message.isClarificationAsk) {
+      return _ClarificationBubble(
+        key: ValueKey(message.id),
+        message: message,
+        onConfirm: (contextId) => notifier.confirmClarification(
+          messageId: message.id,
+          resolutionId: message.clarificationResolutionId ?? '',
+          contextId: contextId,
+          memoryId: message.clarificationResolutionId != null
+              ? message.id.replaceFirst('clarify-', '')
+              : null,
+        ),
+      );
+    }
+
     final isUser = message.isUser;
-    final timeStr = DateFormat('h:mm a').format(DateTime.now());
+    final timeStr = DateFormat('h:mm a').format(message.timestamp);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -506,11 +527,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     if (isUser) ...[
                       const SizedBox(width: 3),
-                      const Icon(
-                        Icons.done_all_rounded,
-                        size: 13,
-                        color: AppColors.accentGreenDark,
-                      ),
+                      // Processing indicator — shows while background analysis runs
+                      if (message.isProcessing)
+                        const _ProcessingDot()
+                      else
+                        const Icon(
+                          Icons.done_all_rounded,
+                          size: 13,
+                          color: AppColors.accentGreenDark,
+                        ),
                     ],
                   ],
                 ),
@@ -518,6 +543,258 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gate 2: Inline Clarification Bubble
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// AI-side bubble that renders a Gate 2 clarification as quick-reply chips.
+///
+/// Tapping a chip calls [onConfirm] with the chosen contextId (or null for
+/// "None of these"), which routes to [ChatNotifier.confirmClarification] →
+/// [ResolutionRepository.resolveResolution] — the same handler used by
+/// [ClarificationCard] on the home/pending-review screens.
+class _ClarificationBubble extends StatelessWidget {
+  const _ClarificationBubble({
+    super.key,
+    required this.message,
+    required this.onConfirm,
+  });
+
+  final ChatMessage message;
+  final void Function(String? contextId) onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = message.clarificationCandidates ?? [];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // AI avatar
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEDE9FE), // electricViolet tint
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.psychology_alt_rounded,
+              size: 18,
+              color: AppColors.electricViolet,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                border: Border.all(
+                  color: AppColors.electricViolet.withAlpha(80),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.electricViolet.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.electricViolet.withAlpha(20),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Memory Context',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.electricViolet,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message.text,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Candidate quick-reply chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...candidates.map((c) => _QuickReplyChip(
+                            label: c.contextName,
+                            sublabel:
+                                '${(c.confidence * 100).toStringAsFixed(0)}%',
+                            onTap: () => onConfirm(c.contextId),
+                          )),
+                      // "None of these" option
+                      _QuickReplyChip(
+                        label: 'None of these',
+                        isNone: true,
+                        onTap: () => onConfirm(null),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickReplyChip extends StatelessWidget {
+  const _QuickReplyChip({
+    required this.label,
+    required this.onTap,
+    this.sublabel,
+    this.isNone = false,
+  });
+
+  final String label;
+  final String? sublabel;
+  final VoidCallback onTap;
+  final bool isNone;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isNone
+              ? AppColors.surfaceVariant
+              : AppColors.electricViolet.withAlpha(15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isNone
+                ? AppColors.border
+                : AppColors.electricViolet.withAlpha(60),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isNone ? AppColors.textSecondary : AppColors.electricViolet,
+              ),
+            ),
+            if (sublabel != null) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.electricViolet.withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  sublabel!,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.electricViolet,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Processing Dot — pulsing indicator while analysis runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProcessingDot extends StatefulWidget {
+  const _ProcessingDot();
+
+  @override
+  State<_ProcessingDot> createState() => _ProcessingDotState();
+}
+
+class _ProcessingDotState extends State<_ProcessingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 900),
+      vsync: this,
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (_, __) => Opacity(
+        opacity: _opacity.value,
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: AppColors.electricViolet,
+            shape: BoxShape.circle,
+          ),
+        ),
       ),
     );
   }

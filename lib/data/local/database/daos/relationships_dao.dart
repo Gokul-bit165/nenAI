@@ -58,4 +58,56 @@ class RelationshipsDao extends DatabaseAccessor<AppDatabase> with _$Relationship
 
   Future<void> deleteRelationship(String id) =>
       (delete(relationshipsTable)..where((t) => t.id.equals(id))).go();
+
+  /// Traverses 2-hop paths connecting entityA to entityB via any intermediate node.
+  /// Example: Dean (entityA) -> suggested -> Flutter (intermediate) -> for -> NENAI (entityB)
+  Future<List<({
+    EntitiesTableData source,
+    RelationshipsTableData hop1,
+    EntitiesTableData intermediate,
+    RelationshipsTableData hop2,
+    EntitiesTableData target,
+  })>> getTwoHopPaths(String entityAId, String entityBId) async {
+    final results = <({
+      EntitiesTableData source,
+      RelationshipsTableData hop1,
+      EntitiesTableData intermediate,
+      RelationshipsTableData hop2,
+      EntitiesTableData target,
+    })>[];
+
+    final aEdges = await getByEntityId(entityAId);
+
+    for (final edge1 in aEdges) {
+      final intermediateId = edge1.sourceEntityId == entityAId
+          ? edge1.targetEntityId
+          : edge1.sourceEntityId;
+
+      if (intermediateId == entityBId) continue;
+
+      final bEdges = await getByEntityId(entityBId);
+      for (final edge2 in bEdges) {
+        final bConnectedId = edge2.sourceEntityId == entityBId
+            ? edge2.targetEntityId
+            : edge2.sourceEntityId;
+
+        if (bConnectedId == intermediateId) {
+          final src = await (select(entitiesTable)..where((t) => t.id.equals(entityAId))).getSingleOrNull();
+          final inter = await (select(entitiesTable)..where((t) => t.id.equals(intermediateId))).getSingleOrNull();
+          final tgt = await (select(entitiesTable)..where((t) => t.id.equals(entityBId))).getSingleOrNull();
+
+          if (src != null && inter != null && tgt != null) {
+            results.add((
+              source: src,
+              hop1: edge1,
+              intermediate: inter,
+              hop2: edge2,
+              target: tgt,
+            ));
+          }
+        }
+      }
+    }
+    return results;
+  }
 }

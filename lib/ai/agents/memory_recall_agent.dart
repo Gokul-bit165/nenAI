@@ -11,6 +11,7 @@ import '../memory/memory_context_builder.dart';
 import '../memory/context_timeline_service.dart';
 import '../memory/reference_resolver.dart';
 import '../memory/temporal_memory_retriever.dart';
+import '../memory/kg_query_engine.dart';
 
 /// Semantic classification of user recall questions.
 enum RecallQuestionType {
@@ -67,6 +68,7 @@ class MemoryRecallAgent {
     required this.relationshipsDao,
     required this.tasksDao,
     required this.temporalMemoryRetriever,
+    this.kgQueryEngine,
   });
 
   final AppDatabase db;
@@ -80,6 +82,7 @@ class MemoryRecallAgent {
   final RelationshipsDao relationshipsDao;
   final TasksDao tasksDao;
   final TemporalMemoryRetriever temporalMemoryRetriever;
+  final KGQueryEngine? kgQueryEngine;
 
   // -- Question Classification -----------------------------------------------
 
@@ -167,7 +170,25 @@ class MemoryRecallAgent {
     final qType = classifyQuestion(message);
     final lower = message.toLowerCase().trim();
 
-    // -- 0. TEMPORAL SUMMARY --------------------------------------------------
+    // -- 0. KG-FIRST GRAPH RECALL ----------------------------------------------
+    if (kgQueryEngine != null) {
+      final kgResult = await kgQueryEngine!.query(message);
+      if (kgResult != null) {
+        final citedSearchResults = kgResult.sourceNoteIds.isNotEmpty
+            ? await hybridRetriever.retrieve(message, limit: 3)
+            : const <HybridSearchResult>[];
+
+        return MemoryRecallResult(
+          replyText: kgResult.answer,
+          questionType: qType,
+          citedNotes: citedSearchResults,
+          graphTriples: kgResult.triples,
+          sourceNoteIds: kgResult.sourceNoteIds,
+        );
+      }
+    }
+
+    // -- 0.5. TEMPORAL SUMMARY --------------------------------------------------
     if (qType == RecallQuestionType.temporalSummary) {
       final scope = _detectTemporalScope(lower);
       final summary = await temporalMemoryRetriever.retrieve(scope);

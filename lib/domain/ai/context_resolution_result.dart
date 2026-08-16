@@ -121,6 +121,7 @@ class ContextResolutionResult {
   bool get isAutoAttached => outcome == ResolutionOutcome.autoAttach;
   bool get isMultiAttached => outcome == ResolutionOutcome.multiAttach;
   bool get isAmbiguous => outcome == ResolutionOutcome.ambiguous;
+  bool get isPendingReview => outcome == ResolutionOutcome.pendingReview;
   bool get isNewContext => outcome == ResolutionOutcome.newContext;
   bool get isUnresolved => outcome == ResolutionOutcome.unresolved;
   bool get isIgnored => outcome == ResolutionOutcome.ignore;
